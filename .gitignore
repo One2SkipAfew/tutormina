@@ -1,0 +1,9 @@
+# Root level ignore
+node_modules/
+.env
+.env.local
+.DS_Store
+
+# Ignore IDE specific files
+.vscode/
+.idea/
