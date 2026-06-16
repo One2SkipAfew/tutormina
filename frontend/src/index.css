@@ -13,7 +13,7 @@
   
   --color-text-main: #333333;
   --color-text-muted: #555555;
-  --color-background: #fdfdfc;
+  --color-background: #fdf8f0; /* Pastel Beige */
   --color-white: #ffffff;
   
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -124,4 +124,32 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Page Layout */
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+/* Sections */
+.section {
+  padding: 5rem 0;
+}
+
+.section-alt {
+  background-color: var(--color-white);
+}
+
+/* Footer */
+.site-footer {
+  background-color: var(--color-gray-dark);
+  color: var(--color-white);
+  padding: 3rem 0;
+  text-align: center;
 }
