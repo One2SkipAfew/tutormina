@@ -1,4 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import './index.css';
 
 // Placeholder Components
@@ -18,11 +21,26 @@ const Home = () => (
 );
 
 const Directory = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Directory (Coming Soon)</h2></div>;
-const Login = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Login (Coming Soon)</h2></div>;
-const Register = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Register (Coming Soon)</h2></div>;
-const Dashboard = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Dashboard (Coming Soon)</h2></div>;
+const Dashboard = () => {
+  const { user, signOut } = useAuth();
+  return (
+    <div className="container" style={{ paddingTop: '4rem' }}>
+      <h2>Dashboard</h2>
+      {user ? (
+        <div>
+          <p>Logged in as: {user.email}</p>
+          <button className="btn btn-outline" onClick={signOut} style={{ marginTop: '1rem' }}>Log Out</button>
+        </div>
+      ) : (
+        <p>Please log in to view your dashboard.</p>
+      )}
+    </div>
+  );
+};
+const VettingApplication = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Tutor/Coach Application (Coming Soon)</h2></div>;
 
-function App() {
+function AppContent() {
+  const { session, signOut } = useAuth();
   return (
     <Router>
       <nav style={{ 
@@ -40,8 +58,17 @@ function App() {
           </Link>
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <Link to="/directory" style={{ fontWeight: 500 }}>Directory</Link>
-            <Link to="/login" style={{ fontWeight: 500 }}>Login</Link>
-            <Link to="/register" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>Get Started</Link>
+            {session ? (
+              <>
+                <Link to="/dashboard" style={{ fontWeight: 500 }}>Dashboard</Link>
+                <button onClick={signOut} className="btn btn-outline" style={{ padding: '0.5rem 1rem' }}>Log Out</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" style={{ fontWeight: 500 }}>Login</Link>
+                <Link to="/register" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>Get Started</Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -53,9 +80,20 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/vetting-application" element={<VettingApplication />} />
         </Routes>
       </main>
-    </Router>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }
 
