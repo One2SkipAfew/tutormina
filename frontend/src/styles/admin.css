@@ -1,0 +1,172 @@
+/* ============================================
+   TutorMina — Admin Portal Styles
+   ============================================ */
+
+.admin-page {
+  padding: 0.5rem 0 2rem;
+}
+
+.admin-page h2 {
+  margin-bottom: 0.25rem;
+  color: var(--color-olive-dark);
+}
+
+.admin-page-subtitle {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.admin-error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+
+.admin-empty-state {
+  color: var(--color-text-muted);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-list-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-gray-warm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--color-white);
+}
+
+.admin-list-row:hover {
+  background: var(--color-background);
+}
+
+.admin-list-row > div:nth-child(2) {
+  flex: 1;
+}
+
+.admin-list-row-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--zone-student-light);
+  color: var(--zone-student-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.admin-list-row-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-list-row-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.admin-detail-modal {
+  max-width: 620px;
+}
+
+.admin-detail-modal h4 {
+  margin-bottom: 0.35rem;
+  margin-top: 1.25rem;
+  color: var(--color-olive-dark);
+}
+
+.admin-detail-photo {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 0.5rem;
+}
+
+.admin-detail-facts {
+  padding-left: 1.25rem;
+  margin: 0;
+}
+
+.admin-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.admin-btn-decline {
+  background: #c62828;
+  color: white;
+}
+
+.admin-btn-decline:hover {
+  background: #b71c1c;
+}
+
+.admin-filters {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-filters input,
+.admin-filters select {
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gray-warm);
+  font-family: inherit;
+}
+
+.admin-filters input {
+  flex: 1;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--color-gray-warm);
+}
+
+.admin-table-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.admin-status-pending { background: #fff3e0; color: #e65100; }
+.admin-status-approved { background: #e8f5e9; color: #2e7d32; }
+.admin-status-declined { background: #ffebee; color: #c62828; }
+.admin-status-suspended { background: #fff3e0; color: #e65100; }
+.admin-status-blocked { background: #ffebee; color: #c62828; }
+.admin-status-deleted { background: #eeeeee; color: #616161; }

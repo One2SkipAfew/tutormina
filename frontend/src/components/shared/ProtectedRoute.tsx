@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../types/lms';
 
@@ -7,8 +7,11 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
 }
 
+const STATUS_GATE_EXEMPT_PATHS = ['/vetting-application', '/application-status'];
+
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, providerDetails, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -37,6 +40,17 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (profile && !STATUS_GATE_EXEMPT_PATHS.includes(location.pathname)) {
+    if (profile.status !== 'approved') {
+      const isUnsubmittedApplication =
+        (profile.role === 'tutor' || profile.role === 'coach') &&
+        profile.status === 'pending' &&
+        !providerDetails?.application_submitted_at;
+
+      return <Navigate to={isUnsubmittedApplication ? '/vetting-application' : '/application-status'} replace />;
+    }
   }
 
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {

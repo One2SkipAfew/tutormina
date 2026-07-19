@@ -1,0 +1,130 @@
+/* ============================================
+   TutorMina — Professional Application Styles
+   ============================================ */
+
+.vetting-section {
+  margin-bottom: 1.5rem;
+}
+
+.vetting-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--color-olive-dark);
+}
+
+.vetting-section label {
+  display: block;
+  font-weight: 500;
+  margin: 0.75rem 0 0.35rem;
+}
+
+.vetting-section input[type="text"],
+.vetting-section input[type="number"],
+.vetting-section input[type="tel"],
+.vetting-section input[type="date"],
+.vetting-section select,
+.vetting-section textarea {
+  width: 100%;
+  padding: 0.65rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gray-warm);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.vetting-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.vetting-photo-preview {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--color-gray-warm);
+}
+
+.vetting-tag-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.vetting-tag-input input {
+  flex: 1;
+}
+
+.vetting-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.vetting-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--zone-student-light);
+  color: var(--zone-student-dark);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.vetting-tag button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.vetting-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.vetting-checkbox-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.vetting-checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+  margin: 0;
+}
+
+.vetting-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--color-gray-warm);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.75rem;
+}
+
+.vetting-list-item-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.vetting-remove-btn {
+  border: none;
+  background: none;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}

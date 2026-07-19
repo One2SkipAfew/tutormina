@@ -152,9 +152,16 @@ export default function SharedDrive() {
             <div className="empty-state-text">
               {searchQuery
                 ? `No resources match "${searchQuery}". Try a different search term.`
-                : 'Resources shared by tutors and coaches will appear here.'
+                : (profile?.role === 'tutor' || profile?.role === 'coach' || profile?.role === 'admin')
+                  ? 'Upload resources and share lesson files, notes and materials with students.'
+                  : 'Resources shared by tutors and coaches will appear here.'
               }
             </div>
+            {!searchQuery && (profile?.role === 'tutor' || profile?.role === 'coach' || profile?.role === 'admin') && (
+              <a href="/dashboard/resources" className="btn btn-primary" style={{ marginTop: '1rem', textDecoration: 'none' }}>
+                Go to My Resources to upload
+              </a>
+            )}
           </div>
         </div>
       ) : (

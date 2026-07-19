@@ -1,4 +1,7 @@
-from fastapi import FastAPI, UploadFile, File
+import smtplib
+from email.mime.text import MIMEText
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -34,6 +37,17 @@ class AudioResponse(BaseModel):
     transcript: str
     summary: str
     insights: list[str]
+
+class ApplicationEmailInput(BaseModel):
+    to: str
+    subject: str
+    body: str
+
+# Local dev SMTP (Supabase's Mailpit/Inbucket container). Swap for a real
+# transactional email provider's SMTP settings in production.
+SMTP_HOST = "127.0.0.1"
+SMTP_PORT = 54325
+EMAIL_FROM = "no-reply@tutormina.local"
 
 # ---- Endpoints ----
 
@@ -143,3 +157,23 @@ async def process_audio(file: UploadFile = File(...)):
             "Action items were discussed near the end",
         ]
     )
+
+
+@app.post("/send-application-email")
+async def send_application_email(input: ApplicationEmailInput):
+    """
+    Send a professional-application status email (approved/declined/suspended/etc).
+    Routes over SMTP to the local Mailpit/Inbucket container in dev.
+    """
+    message = MIMEText(input.body)
+    message["Subject"] = input.subject
+    message["From"] = EMAIL_FROM
+    message["To"] = input.to
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+            server.send_message(message)
+    except OSError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
+
+    return {"status": "sent"}

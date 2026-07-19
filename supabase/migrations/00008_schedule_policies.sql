@@ -1,0 +1,1 @@
+GRANT ALL ON public.provider_schedules TO authenticated; GRANT SELECT ON public.provider_schedules TO anon; create policy "Anyone can view provider schedules" on public.provider_schedules for select using (true); create policy "Providers can insert their own schedules" on public.provider_schedules for insert with check (auth.uid() = provider_id);

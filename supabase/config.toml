@@ -107,7 +107,7 @@ enabled = true
 # Port to use for the email testing server web interface.
 port = 55324
 # Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 54325
+smtp_port = 54325
 # pop3_port = 54326
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
@@ -121,6 +121,12 @@ file_size_limit = "500MiB"
 [storage.buckets.shared-drive]
 public = true
 file_size_limit = "500MiB"
+
+# Professional application photo uploads
+[storage.buckets.professional-photos]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
 
 # Uncomment to configure additional local storage buckets
 # [storage.buckets.images]

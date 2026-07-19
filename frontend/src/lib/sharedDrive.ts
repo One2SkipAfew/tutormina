@@ -108,6 +108,7 @@ export async function uploadFile(
     folder_id?: string;
     visibility?: FileVisibility;
     duration_seconds?: number;
+    sharedWithId?: string;
   }
 ): Promise<SharedFile> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -151,6 +152,7 @@ export async function uploadFile(
       duration_seconds: metadata.duration_seconds || null,
       mime_type: file.type,
       visibility: metadata.visibility || 'public',
+      shared_with_id: metadata.sharedWithId || null,
     })
     .select()
     .single();
@@ -164,6 +166,7 @@ export async function getFiles(options: {
   fileType?: FileType;
   visibility?: FileVisibility;
   uploadedBy?: string;
+  sharedWithId?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -184,6 +187,7 @@ export async function getFiles(options: {
   if (options.fileType) query = query.eq('file_type', options.fileType);
   if (options.visibility) query = query.eq('visibility', options.visibility);
   if (options.uploadedBy) query = query.eq('uploaded_by', options.uploadedBy);
+  if (options.sharedWithId) query = query.eq('shared_with_id', options.sharedWithId);
   if (options.search) query = query.ilike('title', `%${options.search}%`);
   if (options.limit) query = query.limit(options.limit);
   if (options.offset) query = query.range(options.offset, options.offset + (options.limit || 20) - 1);

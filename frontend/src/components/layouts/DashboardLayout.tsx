@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor, getZoneLabel, getRoleDisplayName } from '../../types/lms';
+import NotificationBell from '../shared/NotificationBell';
 import '../../styles/dashboard.css';
 
 // SVG Icons as inline components
@@ -73,6 +74,16 @@ const Icons = {
       <path d="M19 14l.9 2.7L22.6 17.6l-2.7.9L19 21.2l-.9-2.7-2.7-.9 2.7-.9L19 14z" />
     </svg>
   ),
+  MessageCircle: () => (
+    <svg className="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  ),
+  Calendar: () => (
+    <svg className="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
 };
 
 interface NavItem {
@@ -82,7 +93,7 @@ interface NavItem {
 }
 
 export default function DashboardLayout() {
-  const { profile, signOut, isParentMode, toggleParentMode } = useAuth();
+  const { profile, providerDetails, signOut, isParentMode, toggleParentMode } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -95,14 +106,24 @@ export default function DashboardLayout() {
     const common: NavItem[] = [
       { to: '/dashboard', label: 'Overview', icon: Icons.Home },
       { to: '/dashboard/profile', label: 'My Profile', icon: Icons.User },
+      { to: '/dashboard/messages', label: 'Messages', icon: Icons.MessageCircle },
       { to: '/dashboard/shared-drive', label: 'SharedDrive', icon: Icons.Drive },
     ];
+
+    if (role === 'admin') {
+      return [
+        { to: '/dashboard', label: 'Overview', icon: Icons.Home },
+        { to: '/dashboard/admin/applications', label: 'Applications', icon: Icons.Folder },
+        { to: '/dashboard/admin/accounts', label: 'Accounts', icon: Icons.Users },
+      ];
+    }
 
     if (role === 'tutor' || role === 'coach') {
       return [
         ...common,
         { to: '/dashboard/resources', label: 'My Resources', icon: Icons.Folder },
         { to: '/dashboard/students', label: 'My Students', icon: Icons.Users },
+        { to: '/dashboard/calendar', label: 'My Calendar', icon: Icons.Calendar },
         { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
       ];
     }
@@ -110,6 +131,8 @@ export default function DashboardLayout() {
     // Student/Customer
     return [
       ...common,
+      { to: '/dashboard/bookings', label: 'My Bookings', icon: Icons.Calendar },
+      { to: '/dashboard/learning-zone', label: 'Learning Zone', icon: Icons.BarChart },
       { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
     ];
   }, [role]);
@@ -127,7 +150,7 @@ export default function DashboardLayout() {
   const handleCloseMobile = () => setMobileOpen(false);
 
   return (
-    <div className="dashboard-shell">
+    <div className={`dashboard-shell zone-${zone}`}>
       {/* Mobile Overlay */}
       <div
         className={`sidebar-overlay ${mobileOpen ? 'visible' : ''}`}
@@ -196,8 +219,15 @@ export default function DashboardLayout() {
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <div className={`sidebar-user-avatar ${zone}`}>
-              {userInitials}
+            <div
+              className={`sidebar-user-avatar ${zone}`}
+              style={(providerDetails?.avatar_url ?? profile?.avatar_url) ? {
+                backgroundImage: `url(${providerDetails?.avatar_url ?? profile?.avatar_url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              } : undefined}
+            >
+              {!(providerDetails?.avatar_url ?? profile?.avatar_url) && userInitials}
             </div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">
@@ -242,10 +272,7 @@ export default function DashboardLayout() {
               <Icons.Search />
               <input type="text" placeholder="Search..." />
             </div>
-            <button className="topbar-btn" aria-label="Notifications">
-              <Icons.Bell />
-              <span className="topbar-notification-dot" />
-            </button>
+            <NotificationBell />
           </div>
         </header>
 

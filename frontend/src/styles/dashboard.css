@@ -19,6 +19,11 @@
   --zone-student-dark: #1565C0;
   --zone-student-gradient: linear-gradient(135deg, #2196F3, #64B5F6);
 
+  --zone-admin: #6A1B9A;
+  --zone-admin-light: #F3E5F5;
+  --zone-admin-dark: #4A148C;
+  --zone-admin-gradient: linear-gradient(135deg, #6A1B9A, #8E24AA);
+
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 68px;
   --topbar-height: 64px;
@@ -88,26 +93,31 @@
 .sidebar-toggle {
   position: absolute;
   top: 18px;
-  right: -14px;
-  width: 28px;
-  height: 28px;
+  right: -16px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: #1a1a2e;
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  color: #e0e0e0;
+  background: #fff;
+  border: 2px solid var(--zone-student);
+  color: var(--zone-student-dark);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
   z-index: 101;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
+.zone-tutor .sidebar-toggle { border-color: var(--zone-tutor); color: var(--zone-tutor-dark); }
+.zone-coach .sidebar-toggle { border-color: var(--zone-coach); color: var(--zone-coach-dark); }
+.zone-student .sidebar-toggle { border-color: var(--zone-student); color: var(--zone-student-dark); }
+.zone-admin .sidebar-toggle { border-color: var(--zone-admin); color: var(--zone-admin-dark); }
+
 .sidebar-toggle:hover {
-  background: #16213e;
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 /* Zone Badge */
@@ -144,6 +154,11 @@
 .sidebar-zone-badge.student {
   background: var(--zone-student-light);
   color: var(--zone-student-dark);
+}
+
+.sidebar-zone-badge.admin {
+  background: var(--zone-admin-light);
+  color: var(--zone-admin-dark);
 }
 
 /* Sidebar Navigation */
@@ -275,6 +290,10 @@
   background: var(--zone-student-gradient);
 }
 
+.sidebar-user-avatar.admin {
+  background: var(--zone-admin-gradient);
+}
+
 .sidebar-user-info {
   overflow: hidden;
   opacity: 1;
@@ -321,7 +340,7 @@
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -330,6 +349,11 @@
   top: 0;
   z-index: 50;
 }
+
+.zone-tutor .dashboard-topbar { border-bottom-color: var(--zone-tutor); }
+.zone-coach .dashboard-topbar { border-bottom-color: var(--zone-coach); }
+.zone-student .dashboard-topbar { border-bottom-color: var(--zone-student); }
+.zone-admin .dashboard-topbar { border-bottom-color: var(--zone-admin); }
 
 .topbar-left {
   display: flex;
@@ -443,7 +467,14 @@
 /* ---- Dashboard Page Header ---- */
 .dashboard-page-header {
   margin-bottom: 2rem;
+  padding-left: 1rem;
+  border-left: 4px solid transparent;
 }
+
+.zone-tutor .dashboard-page-header { border-left-color: var(--zone-tutor); }
+.zone-coach .dashboard-page-header { border-left-color: var(--zone-coach); }
+.zone-student .dashboard-page-header { border-left-color: var(--zone-student); }
+.zone-admin .dashboard-page-header { border-left-color: var(--zone-admin); }
 
 .dashboard-page-title {
   font-size: 1.75rem;
@@ -498,6 +529,7 @@
 .stat-card-icon.tutor { background: var(--zone-tutor-light); }
 .stat-card-icon.coach { background: var(--zone-coach-light); }
 .stat-card-icon.student { background: var(--zone-student-light); }
+.stat-card-icon.admin { background: var(--zone-admin-light); }
 
 .stat-card-value {
   font-size: 1.75rem;
@@ -704,8 +736,18 @@
 }
 
 /* ---- Utility: Fade-in animation ---- */
+/* No "forwards" fill mode: while a fill-forwards animation is holding its end state, the
+   browser keeps reporting a *resolved* transform (a matrix) for as long as that fill is in
+   effect - forever, in this case - regardless of what the end keyframe's authored value is
+   ("none" resolves the exact same way as "translateY(0)" once it's an active animation fill).
+   Any resolved transform other than the literal absence of the property makes the element a
+   containing block for position:fixed descendants, which is what was trapping modals (e.g.
+   the upload modal in ResourceManager.tsx) inside the page content instead of the viewport.
+   Without "forwards", once the 0.4s animation finishes the element reverts to the plain
+   cascade - which never sets opacity/transform on this class outside the animation - so it
+   ends up at opacity:1/no-transform natually, with no transform lingering at all. */
 .animate-slide-up {
-  animation: slideUp 0.4s ease-out forwards;
+  animation: slideUp 0.4s ease-out;
 }
 
 @keyframes slideUp {

@@ -11,11 +11,19 @@ import SharedDrive from './pages/dashboard/SharedDrive';
 import ResourceManager from './pages/dashboard/ResourceManager';
 import MyStudents from './pages/dashboard/MyStudents';
 import AIInsights from './pages/dashboard/AIInsights';
+import Messages from './pages/dashboard/Messages';
+import VettingApplication from './pages/VettingApplication';
+import ApplicationStatus from './pages/ApplicationStatus';
+import AdminApplications from './pages/dashboard/admin/Applications';
+import AdminAccounts from './pages/dashboard/admin/Accounts';
+import AdminSetup from './pages/AdminSetup';
+import AdminLogin from './pages/AdminLogin';
+import Directory from './pages/Directory';
+import DirectoryProfile from './pages/DirectoryProfile';
+import ProviderCalendar from './pages/dashboard/ProviderCalendar';
+import MyBookings from './pages/dashboard/MyBookings';
+import LearningZone from './pages/dashboard/LearningZone';
 import './index.css';
-
-// Placeholder Components
-const Directory = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Directory (Coming Soon)</h2></div>;
-const VettingApplication = () => <div className="container" style={{ paddingTop: '4rem' }}><h2>Tutor/Coach Application (Coming Soon)</h2></div>;
 
 function PublicNav() {
   const { session, signOut } = useAuth();
@@ -76,9 +84,23 @@ function App() {
           {/* Public Pages */}
           <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
           <Route path="/directory" element={<PublicLayout><Directory /></PublicLayout>} />
+          <Route path="/directory/:id" element={<PublicLayout><DirectoryProfile /></PublicLayout>} />
           <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
           <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
-          <Route path="/vetting-application" element={<PublicLayout><VettingApplication /></PublicLayout>} />
+
+          {/* Hidden admin routes - not linked anywhere in public nav */}
+          <Route path="/admin-setup" element={<PublicLayout><AdminSetup /></PublicLayout>} />
+          <Route path="/admin-login" element={<PublicLayout><AdminLogin /></PublicLayout>} />
+          <Route path="/vetting-application" element={
+            <ProtectedRoute>
+              <PublicLayout><VettingApplication /></PublicLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/application-status" element={
+            <ProtectedRoute>
+              <PublicLayout><ApplicationStatus /></PublicLayout>
+            </ProtectedRoute>
+          } />
 
           {/* Dashboard (Protected + Sidebar Layout) */}
           <Route
@@ -91,6 +113,7 @@ function App() {
           >
             <Route index element={<DashboardHome />} />
             <Route path="profile" element={<ProfileEditor />} />
+            <Route path="messages" element={<Messages />} />
             <Route path="shared-drive" element={<SharedDrive />} />
             <Route path="resources" element={
               <ProtectedRoute allowedRoles={['tutor', 'coach', 'admin']}>
@@ -102,7 +125,28 @@ function App() {
                 <MyStudents />
               </ProtectedRoute>
             } />
+            <Route path="calendar" element={
+              <ProtectedRoute allowedRoles={['tutor', 'coach', 'admin']}>
+                <ProviderCalendar />
+              </ProtectedRoute>
+            } />
+            <Route path="bookings" element={<MyBookings />} />
+            <Route path="learning-zone" element={
+              <ProtectedRoute allowedRoles={['customer']}>
+                <LearningZone />
+              </ProtectedRoute>
+            } />
             <Route path="ai-insights" element={<AIInsights />} />
+            <Route path="admin/applications" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminApplications />
+              </ProtectedRoute>
+            } />
+            <Route path="admin/accounts" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminAccounts />
+              </ProtectedRoute>
+            } />
           </Route>
 
           {/* Fallback */}

@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import type { Profile } from '../types/lms';
+import type { Profile, ProviderDetails } from '../types/lms';
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  providerDetails: ProviderDetails | null;
   loading: boolean;
   isParentMode: boolean;
   toggleParentMode: () => void;
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [providerDetails, setProviderDetails] = useState<ProviderDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [isParentMode, setIsParentMode] = useState(false);
 
@@ -37,12 +39,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return data as Profile;
   }, []);
 
+  const fetchProviderDetails = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from('provider_details')
+      .select('*')
+      .eq('profile_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Could not fetch provider details:', error.message);
+      return null;
+    }
+    return data as ProviderDetails | null;
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (user) {
       const p = await fetchProfile(user.id);
       setProfile(p);
+      if (p && (p.role === 'tutor' || p.role === 'coach')) {
+        setProviderDetails(await fetchProviderDetails(user.id));
+      } else {
+        setProviderDetails(null);
+      }
     }
-  }, [user, fetchProfile]);
+  }, [user, fetchProfile, fetchProviderDetails]);
 
   useEffect(() => {
     // Get initial session
@@ -53,6 +74,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         const p = await fetchProfile(session.user.id);
         setProfile(p);
+        if (p && (p.role === 'tutor' || p.role === 'coach')) {
+          setProviderDetails(await fetchProviderDetails(session.user.id));
+        }
       }
 
       setLoading(false);
@@ -66,8 +90,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         const p = await fetchProfile(session.user.id);
         setProfile(p);
+        if (p && (p.role === 'tutor' || p.role === 'coach')) {
+          setProviderDetails(await fetchProviderDetails(session.user.id));
+        } else {
+          setProviderDetails(null);
+        }
       } else {
         setProfile(null);
+        setProviderDetails(null);
         setIsParentMode(false);
       }
 
@@ -75,11 +105,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchProviderDetails]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setProviderDetails(null);
     setIsParentMode(false);
   };
 
@@ -92,6 +123,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       session,
       user,
       profile,
+      providerDetails,
       loading,
       isParentMode,
       toggleParentMode,
