@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { getZoneColor } from '../../types/lms';
+
 import { saveSessionNote, getSessionNotes, deleteSessionNote, type AiSessionNote } from '../../lib/aiNotes';
-import { summariseText, extractKeyTopics, parsePdf, extractImageText, scrapeUrl, speechToText, textToSpeech, processAudio } from '../../lib/aiApi';
-import { Bot, FileText, Image as ImageIcon, Globe, Mic, Volume2, Sparkles, Video, Search, FileJson } from 'lucide-react';
+import { summariseText, extractKeyTopics, parsePdf, extractImageText, scrapeUrl, speechToText, textToSpeech } from '../../lib/aiApi';
+import { FileText, Image as ImageIcon, Globe, Mic, Volume2, Sparkles, Video, Search, FileJson } from 'lucide-react';
 import '../../styles/shared-drive.css';
 import '../../styles/messaging.css';
 
 type ToolTab = 'text' | 'pdf' | 'image' | 'web' | 'stt' | 'tts';
 
 export default function AIInsights() {
-  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<ToolTab>('text');
 
   // Input states

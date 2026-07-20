@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+
 import { useAuth } from '../../contexts/AuthContext';
 import { useRealtimeTranscript } from '../../lib/useRealtimeTranscript';
 import { useFactChecker } from '../../lib/useFactChecker';
@@ -37,8 +37,6 @@ const VERDICT_CONFIG: Record<string, { color: string; bg: string; label: string 
 };
 
 export default function LiveSession() {
-  const { bookingId } = useParams<{ bookingId?: string }>();
-  const navigate = useNavigate();
   const { profile } = useAuth();
 
   // Transcription

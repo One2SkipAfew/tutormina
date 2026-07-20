@@ -73,6 +73,7 @@ export async function updateBooking(bookingId: string, updates: {
   duration_minutes: number;
   student_topic?: string | null;
   student_note?: string | null;
+  use_video_room?: boolean;
 }): Promise<void> {
   const { error } = await supabase.from('bookings').update(updates).eq('id', bookingId);
   if (error) throw error;

@@ -68,7 +68,7 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const isPausedRef = useRef(false);
 
   // Keep ref in sync with state for use inside callbacks
@@ -211,11 +211,10 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
   }, [cleanupAudio]);
 
   const startWebSpeech = useCallback((): boolean => {
-    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition
-      || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) return false;
 
-    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';

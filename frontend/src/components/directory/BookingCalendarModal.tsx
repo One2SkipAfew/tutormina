@@ -74,11 +74,13 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
     if (!selectedDate) return;
 
     async function fetchSlots() {
+      const date = selectedDate;
+      if (!date) return;
       setLoadingSlots(true);
       // We need to fetch bookings for the selected date to filter out occupied slots
-      const startOfDay = new Date(selectedDate);
+      const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
+      const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
       let query = supabase
