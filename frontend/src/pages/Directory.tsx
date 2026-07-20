@@ -28,7 +28,7 @@ export default function Directory() {
   useEffect(() => {
     async function fetchProviders() {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select(`
           *,

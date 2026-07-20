@@ -1,0 +1,1 @@
+import { supabase } from './src/lib/supabaseClient.ts'; async function run() { const { data, error } = await supabase.from('profiles').select('*, provider_details(*)'); console.log('ERROR:', error); console.log('DATA:', JSON.stringify(data, null, 2)); } run();

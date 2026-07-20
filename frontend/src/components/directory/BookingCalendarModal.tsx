@@ -45,6 +45,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
   );
   const [topic, setTopic] = useState(editingBooking?.student_topic ?? '');
   const [note, setNote] = useState(editingBooking?.student_note ?? '');
+  const [useVideoRoom, setUseVideoRoom] = useState(editingBooking?.use_video_room ?? true);
 
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
@@ -178,6 +179,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
           duration_minutes: selectedDuration,
           student_topic: topic || null,
           student_note: note.trim() || null,
+          use_video_room: useVideoRoom,
         });
       } catch (err) {
         setBookingStatus('error');
@@ -206,6 +208,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
       status: 'pending', // Tutor/Coach needs to confirm later
       student_topic: topic || null,
       student_note: note.trim() || null,
+      use_video_room: useVideoRoom,
     });
 
     if (error) {
@@ -452,6 +455,25 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
                     style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0', resize: 'vertical', fontFamily: 'inherit' }}
                   />
                 </div>
+              </div>
+
+              <div style={{ marginTop: '1.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <input
+                    type="checkbox"
+                    checked={useVideoRoom}
+                    onChange={(e) => setUseVideoRoom(e.target.checked)}
+                    style={{ width: '1.2rem', height: '1.2rem', accentColor: 'var(--color-primary-dark)' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>
+                      Host this session in a TutorMina Video Room
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      Enjoy real-time transcription, AI insights, and fact-checking during your session.
+                    </div>
+                  </div>
+                </label>
               </div>
             </div>
 

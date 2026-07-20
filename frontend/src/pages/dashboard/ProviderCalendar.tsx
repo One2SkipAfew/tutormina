@@ -195,14 +195,32 @@ export default function ProviderCalendar() {
     fetchBookings();
   }, [profile]);
 
-  const updateBookingStatus = async (id: string, status: string) => {
+  const updateBookingStatus = async (booking: PopulatedBooking, status: string) => {
+    let videoRoomId = booking.video_room_id;
+
+    if (status === 'confirmed' && booking.use_video_room && !booking.video_room_id) {
+      const { data: vr, error: vrError } = await supabase
+        .from('video_rooms')
+        .insert({
+          booking_id: booking.id,
+          host_id: profile!.id,
+          room_name: `${booking.customer.first_name}'s Session`,
+        })
+        .select()
+        .single();
+
+      if (!vrError && vr) {
+        videoRoomId = vr.id;
+      }
+    }
+
     const { error } = await supabase
       .from('bookings')
-      .update({ status })
-      .eq('id', id);
+      .update({ status, video_room_id: videoRoomId })
+      .eq('id', booking.id);
 
     if (!error) {
-      setBookings(prev => prev.map(b => b.id === id ? { ...b, status: status as any } : b));
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: status as any, video_room_id: videoRoomId } : b));
     }
   };
 
@@ -465,14 +483,14 @@ export default function ProviderCalendar() {
                           <button
                             className="btn btn-primary"
                             style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem', background: '#34a853', borderColor: '#34a853' }}
-                            onClick={() => updateBookingStatus(booking.id, 'confirmed')}
+                            onClick={() => updateBookingStatus(booking, 'confirmed')}
                           >
                             Approve
                           </button>
                           <button
                             className="btn btn-outline"
                             style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem', color: '#ea4335', borderColor: '#ea4335' }}
-                            onClick={() => updateBookingStatus(booking.id, 'cancelled')}
+                            onClick={() => updateBookingStatus(booking, 'cancelled')}
                           >
                             Decline
                           </button>
@@ -484,7 +502,21 @@ export default function ProviderCalendar() {
                         </button>
                       )}
                       {booking.status === 'confirmed' && (
-                        booking.meeting_link ? (
+                        booking.use_video_room ? (
+                          booking.video_room_id ? (
+                            <button 
+                              className="btn btn-primary" 
+                              style={{ display: 'block', width: '100%', textAlign: 'center', padding: '0.4rem', fontSize: '0.85rem', marginBottom: '0.5rem', background: 'linear-gradient(135deg, var(--color-primary), var(--color-spring-dark))', border: 'none' }} 
+                              onClick={() => navigate(`/dashboard/video-room/${booking.video_room_id}`)}
+                            >
+                              📹 Join Video Room
+                            </button>
+                          ) : (
+                            <div style={{ fontSize: '0.8rem', color: '#b06000', background: '#fef7e0', padding: '0.4rem 0.8rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
+                              Video room is being prepared...
+                            </div>
+                          )
+                        ) : booking.meeting_link ? (
                           <a
                             href={booking.meeting_link} target="_blank" rel="noopener noreferrer"
                             className="btn btn-primary" style={{ display: 'block', textAlign: 'center', padding: '0.4rem', fontSize: '0.85rem', marginBottom: '0.5rem' }}

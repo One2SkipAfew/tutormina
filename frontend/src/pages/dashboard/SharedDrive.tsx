@@ -1,18 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFolders, getFiles } from '../../lib/sharedDrive';
-import { getZoneColor, getFileTypeIcon, formatFileSize } from '../../types/lms';
+import { getZoneColor, formatFileSize } from '../../types/lms';
 import type { Folder, SharedFile, FileType } from '../../types/lms';
+import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic, Monitor, Search, Loader, Folder as FolderIcon, GraduationCap, Users, BookMarked, Sparkles, Download, Paperclip } from 'lucide-react';
 import '../../styles/shared-drive.css';
 
-const FILE_TYPE_FILTERS: { value: FileType | ''; label: string; icon: string }[] = [
-  { value: '', label: 'All', icon: '📋' },
-  { value: 'document', label: 'Documents', icon: '📄' },
-  { value: 'video', label: 'Videos', icon: '🎬' },
-  { value: 'past_paper', label: 'Past Papers', icon: '📝' },
-  { value: 'notes', label: 'Notes', icon: '📒' },
-  { value: 'course_material', label: 'Course Material', icon: '📚' },
-  { value: 'recording', label: 'Recordings', icon: '🎙️' },
+const getIconForFileType = (type: FileType | string, size = 24) => {
+  switch (type) {
+    case 'document': return <FileText size={size} />;
+    case 'video': return <Film size={size} />;
+    case 'past_paper': return <Edit3 size={size} />;
+    case 'notes': return <Book size={size} />;
+    case 'course_material': return <BookOpen size={size} />;
+    case 'recording': return <Mic size={size} />;
+    default: return <Paperclip size={size} />;
+  }
+};
+
+const FILE_TYPE_FILTERS: { value: FileType | ''; label: string; icon: React.ReactNode }[] = [
+  { value: '', label: 'All', icon: <ClipboardList size={16} /> },
+  { value: 'document', label: 'Documents', icon: <FileText size={16} /> },
+  { value: 'video', label: 'Videos', icon: <Film size={16} /> },
+  { value: 'past_paper', label: 'Past Papers', icon: <Edit3 size={16} /> },
+  { value: 'notes', label: 'Notes', icon: <Book size={16} /> },
+  { value: 'course_material', label: 'Course Material', icon: <BookOpen size={16} /> },
+  { value: 'recording', label: 'Recordings', icon: <Mic size={16} /> },
 ];
 
 export default function SharedDrive() {
@@ -69,7 +82,7 @@ export default function SharedDrive() {
   return (
     <div className="animate-slide-up">
       <div className="dashboard-page-header">
-        <h1 className="dashboard-page-title">🖥️ SharedDrive</h1>
+        <h1 className="dashboard-page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Monitor size={32} color="#2196F3" /> SharedDrive</h1>
         <p className="dashboard-page-subtitle">
           Access shared resources — past papers, recordings, notes, and course materials from tutors and coaches.
         </p>
@@ -78,7 +91,7 @@ export default function SharedDrive() {
       {/* Search */}
       <div className="content-panel" style={{ marginBottom: '1rem' }}>
         <div style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '1.1rem' }}>🔍</span>
+          <Search size={18} color="#64748b" />
           <input
             type="text"
             placeholder="Search resources by title..."
@@ -106,7 +119,7 @@ export default function SharedDrive() {
             className={`drive-filter-chip ${activeFilter === f.value ? 'active' : ''}`}
             onClick={() => setActiveFilter(f.value as FileType | '')}
           >
-            {f.icon} {f.label}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{f.icon} {f.label}</span>
           </button>
         ))}
       </div>
@@ -139,13 +152,13 @@ export default function SharedDrive() {
       {/* Content */}
       {loading ? (
         <div className="empty-state">
-          <div className="empty-state-icon">⏳</div>
+          <div className="empty-state-icon"><Loader size={48} className="spin" /></div>
           <div className="empty-state-title">Loading resources...</div>
         </div>
       ) : folders.length === 0 && files.length === 0 ? (
         <div className="content-panel">
           <div className="empty-state">
-            <div className="empty-state-icon">🖥️</div>
+            <div className="empty-state-icon"><Monitor size={48} /></div>
             <div className="empty-state-title">
               {searchQuery ? 'No results found' : 'Nothing here yet'}
             </div>
@@ -169,7 +182,7 @@ export default function SharedDrive() {
           {/* Folders */}
           {folders.map(folder => (
             <div key={folder.id} className="folder-card" onClick={() => navigateToFolder(folder)}>
-              <div className="folder-card-icon">📁</div>
+              <div className="folder-card-icon"><FolderIcon size={28} color="#fcd34d" /></div>
               <div className="folder-card-name">{folder.name}</div>
               {folder.description && <div className="folder-card-count">{folder.description}</div>}
             </div>
@@ -179,20 +192,20 @@ export default function SharedDrive() {
           {files.map(file => (
             <div key={file.id} className="file-card" onClick={() => setSelectedFile(file)}>
               <div className={`file-card-thumbnail ${file.file_type}`}>
-                {getFileTypeIcon(file.file_type)}
+                {getIconForFileType(file.file_type, 32)}
                 <span className="file-card-type-badge">{file.file_type.replace('_', ' ')}</span>
               </div>
               <div className="file-card-body">
                 <div className="file-card-title">{file.title}</div>
                 <div className="file-card-meta">
-                  <span className="file-card-uploader">
-                    {file.uploader_role === 'tutor' ? '🎓' : file.uploader_role === 'coach' ? '🤝' : '📖'}
+                  <span className="file-card-uploader" style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                    {file.uploader_role === 'tutor' ? <GraduationCap size={14} /> : file.uploader_role === 'coach' ? <Users size={14} /> : <BookMarked size={14} />}
                     {file.uploader_name}
                   </span>
                   <span>•</span>
                   <span>{formatFileSize(file.file_size_bytes)}</span>
                 </div>
-                {file.ai_summary && <div className="file-card-ai-badge">✨ AI Summary</div>}
+                {file.ai_summary && <div className="file-card-ai-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}><Sparkles size={12} /> AI Summary</div>}
               </div>
             </div>
           ))}
@@ -204,7 +217,7 @@ export default function SharedDrive() {
         <div className="upload-modal-overlay" onClick={() => setSelectedFile(null)}>
           <div className="upload-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="upload-modal-header">
-              <h3 className="upload-modal-title">{getFileTypeIcon(selectedFile.file_type)} {selectedFile.title}</h3>
+              <h3 className="upload-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>{getIconForFileType(selectedFile.file_type, 20)} {selectedFile.title}</h3>
               <button className="upload-modal-close" onClick={() => setSelectedFile(null)}>×</button>
             </div>
             <div className="upload-modal-body">
@@ -233,7 +246,7 @@ export default function SharedDrive() {
               {selectedFile.ai_summary ? (
                 <div className="ai-panel">
                   <div className="ai-panel-header">
-                    <span className="ai-panel-icon">✨</span>
+                    <span className="ai-panel-icon"><Sparkles size={16} /></span>
                     <span className="ai-panel-title">AI Summary</span>
                   </div>
                   <div className="ai-panel-content">{selectedFile.ai_summary}</div>
@@ -247,8 +260,8 @@ export default function SharedDrive() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button className="ai-action-btn">✨ Summarise</button>
-                  <button className="ai-action-btn">🔍 Extract Topics</button>
+                  <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sparkles size={14} /> Summarise</button>
+                  <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Search size={14} /> Extract Topics</button>
                 </div>
               )}
             </div>
@@ -263,9 +276,10 @@ export default function SharedDrive() {
                     padding: '0.5rem 1.25rem', fontSize: '0.85rem',
                     background: zone === 'tutor' ? 'var(--zone-tutor)' : zone === 'coach' ? 'var(--zone-coach)' : 'var(--zone-student)',
                     textDecoration: 'none',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem'
                   }}
                 >
-                  ⬇️ Download
+                  <Download size={16} /> Download
                 </a>
               )}
             </div>

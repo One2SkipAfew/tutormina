@@ -77,7 +77,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
 
 export function validateFile(file: File): string | null {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-  const isVideo = FILE_LIMITS.ALLOWED_VIDEO_TYPES.includes(ext);
+  const isVideo = (FILE_LIMITS.ALLOWED_VIDEO_TYPES as readonly string[]).includes(ext);
   const maxSize = isVideo ? FILE_LIMITS.MAX_VIDEO_SIZE_MB : FILE_LIMITS.MAX_FILE_SIZE_MB;
   const fileSizeMB = file.size / (1024 * 1024);
 
@@ -92,7 +92,7 @@ export function validateFile(file: File): string | null {
     ...FILE_LIMITS.ALLOWED_AUDIO_TYPES,
   ];
 
-  if (!allAllowed.includes(ext)) {
+  if (!(allAllowed as readonly string[]).includes(ext)) {
     return `File type "${ext}" is not supported. Allowed: ${allAllowed.join(', ')}`;
   }
 

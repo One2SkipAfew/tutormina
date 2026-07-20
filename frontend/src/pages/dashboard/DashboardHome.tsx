@@ -10,15 +10,17 @@ import { getLearningStreak } from '../../lib/learningZone';
 import { supabase } from '../../lib/supabaseClient';
 import SessionCompletionPrompt from '../../components/shared/SessionCompletionPrompt';
 
+import { Users, BookOpen, Calendar, Clock, MessageCircle, Target, Trophy, UploadCloud, HardDrive, Sparkles, ClipboardCheck, User } from 'lucide-react';
+
 interface StatItem {
-  icon: string;
+  icon: React.ReactNode;
   value: string;
   label: string;
   to?: string;
 }
 
 interface QuickAction {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   description: string;
   to: string;
@@ -27,26 +29,26 @@ interface QuickAction {
 function getStatsForRole(role: UserRole): StatItem[] {
   if (role === 'tutor') {
     return [
-      { icon: '👨‍🎓', value: '—', label: 'Active Students', to: '/dashboard/students' },
-      { icon: '📚', value: '—', label: 'Resources Shared', to: '/dashboard/shared-drive' },
-      { icon: '📅', value: '—', label: 'Upcoming Sessions', to: '/dashboard/calendar' },
-      { icon: '⏱️', value: '—', label: 'Session Hours', to: '/dashboard/calendar' },
+      { icon: <Users size={24} />, value: '—', label: 'Active Students', to: '/dashboard/students' },
+      { icon: <BookOpen size={24} />, value: '—', label: 'Resources Shared', to: '/dashboard/shared-drive' },
+      { icon: <Calendar size={24} />, value: '—', label: 'Upcoming Sessions', to: '/dashboard/calendar' },
+      { icon: <Clock size={24} />, value: '—', label: 'Session Hours', to: '/dashboard/calendar' },
     ];
   }
   if (role === 'coach') {
     return [
-      { icon: '🤝', value: '—', label: 'Active Clients', to: '/dashboard/students' },
-      { icon: '📁', value: '—', label: 'Resources Shared', to: '/dashboard/shared-drive' },
-      { icon: '📅', value: '—', label: 'Upcoming Sessions', to: '/dashboard/calendar' },
-      { icon: '💬', value: '—', label: 'Session Hours', to: '/dashboard/calendar' },
+      { icon: <Users size={24} />, value: '—', label: 'Active Clients', to: '/dashboard/students' },
+      { icon: <BookOpen size={24} />, value: '—', label: 'Resources Shared', to: '/dashboard/shared-drive' },
+      { icon: <Calendar size={24} />, value: '—', label: 'Upcoming Sessions', to: '/dashboard/calendar' },
+      { icon: <MessageCircle size={24} />, value: '—', label: 'Session Hours', to: '/dashboard/calendar' },
     ];
   }
   // Student
   return [
-    { icon: '📖', value: '—', label: 'Resources Available', to: '/dashboard/shared-drive' },
-    { icon: '📅', value: '—', label: 'Upcoming Sessions', to: '/dashboard/bookings' },
-    { icon: '🎯', value: '—', label: 'Learning Streak', to: '/dashboard/learning-zone' },
-    { icon: '🏆', value: '—', label: 'Completed Sessions', to: '/dashboard/learning-zone' },
+    { icon: <BookOpen size={24} />, value: '—', label: 'Resources Available', to: '/dashboard/shared-drive' },
+    { icon: <Calendar size={24} />, value: '—', label: 'Upcoming Sessions', to: '/dashboard/bookings' },
+    { icon: <Target size={24} />, value: '—', label: 'Learning Streak', to: '/dashboard/learning-zone' },
+    { icon: <Trophy size={24} />, value: '—', label: 'Completed Sessions', to: '/dashboard/learning-zone' },
   ];
 }
 
@@ -64,17 +66,17 @@ async function getProviderStats(providerId: string, role: UserRole): Promise<Sta
 
   if (role === 'coach') {
     return [
-      { icon: '🤝', value: String(students.length), label: 'Active Clients', to: '/dashboard/students' },
-      { icon: '📁', value: String(resourcesCount), label: 'Resources Shared', to: '/dashboard/shared-drive' },
-      { icon: '📅', value: String(upcomingCount), label: 'Upcoming Sessions', to: '/dashboard/calendar' },
-      { icon: '💬', value: String(sessionHours), label: 'Session Hours', to: '/dashboard/calendar' },
+      { icon: <Users size={24} />, value: String(students.length), label: 'Active Clients', to: '/dashboard/students' },
+      { icon: <BookOpen size={24} />, value: String(resourcesCount), label: 'Resources Shared', to: '/dashboard/shared-drive' },
+      { icon: <Calendar size={24} />, value: String(upcomingCount), label: 'Upcoming Sessions', to: '/dashboard/calendar' },
+      { icon: <MessageCircle size={24} />, value: String(sessionHours), label: 'Session Hours', to: '/dashboard/calendar' },
     ];
   }
   return [
-    { icon: '👨‍🎓', value: String(students.length), label: 'Active Students', to: '/dashboard/students' },
-    { icon: '📚', value: String(resourcesCount), label: 'Resources Shared', to: '/dashboard/shared-drive' },
-    { icon: '📅', value: String(upcomingCount), label: 'Upcoming Sessions', to: '/dashboard/calendar' },
-    { icon: '⏱️', value: String(sessionHours), label: 'Session Hours', to: '/dashboard/calendar' },
+    { icon: <Users size={24} />, value: String(students.length), label: 'Active Students', to: '/dashboard/students' },
+    { icon: <BookOpen size={24} />, value: String(resourcesCount), label: 'Resources Shared', to: '/dashboard/shared-drive' },
+    { icon: <Calendar size={24} />, value: String(upcomingCount), label: 'Upcoming Sessions', to: '/dashboard/calendar' },
+    { icon: <Clock size={24} />, value: String(sessionHours), label: 'Session Hours', to: '/dashboard/calendar' },
   ];
 }
 
@@ -89,42 +91,42 @@ async function getCustomerStats(): Promise<StatItem[]> {
   ]);
 
   return [
-    { icon: '📖', value: String(resourcesCount ?? 0), label: 'Resources Available', to: '/dashboard/shared-drive' },
-    { icon: '📅', value: String(upcoming), label: 'Upcoming Sessions', to: '/dashboard/bookings' },
-    { icon: '🎯', value: String(streak), label: 'Learning Streak', to: '/dashboard/learning-zone' },
-    { icon: '🏆', value: String(completed), label: 'Completed Sessions', to: '/dashboard/learning-zone' },
+    { icon: <BookOpen size={24} />, value: String(resourcesCount ?? 0), label: 'Resources Available', to: '/dashboard/shared-drive' },
+    { icon: <Calendar size={24} />, value: String(upcoming), label: 'Upcoming Sessions', to: '/dashboard/bookings' },
+    { icon: <Target size={24} />, value: String(streak), label: 'Learning Streak', to: '/dashboard/learning-zone' },
+    { icon: <Trophy size={24} />, value: String(completed), label: 'Completed Sessions', to: '/dashboard/learning-zone' },
   ];
 }
 
 function getQuickActionsForRole(role: UserRole): QuickAction[] {
   if (role === 'tutor') {
     return [
-      { icon: '📂', label: 'Upload Resources', description: 'Share notes, past papers, or course material', to: '/dashboard/resources' },
-      { icon: '🖥️', label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
-      { icon: '👨‍🎓', label: 'My Students', description: 'View and manage your students', to: '/dashboard/students' },
-      { icon: '✨', label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
+      { icon: <UploadCloud size={24} />, label: 'Upload Resources', description: 'Share notes, past papers, or course material', to: '/dashboard/resources' },
+      { icon: <HardDrive size={24} />, label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
+      { icon: <Users size={24} />, label: 'My Students', description: 'View and manage your students', to: '/dashboard/students' },
+      { icon: <Sparkles size={24} />, label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
     ];
   }
   if (role === 'coach') {
     return [
-      { icon: '📂', label: 'Upload Resources', description: 'Share coaching materials & recordings', to: '/dashboard/resources' },
-      { icon: '🖥️', label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
-      { icon: '🤝', label: 'My Clients', description: 'View and manage your coaching clients', to: '/dashboard/students' },
-      { icon: '✨', label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
+      { icon: <UploadCloud size={24} />, label: 'Upload Resources', description: 'Share coaching materials & recordings', to: '/dashboard/resources' },
+      { icon: <HardDrive size={24} />, label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
+      { icon: <Users size={24} />, label: 'My Clients', description: 'View and manage your coaching clients', to: '/dashboard/students' },
+      { icon: <Sparkles size={24} />, label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
     ];
   }
   if (role === 'admin') {
     return [
-      { icon: '📋', label: 'Review Applications', description: 'Approve or decline pending professional applications', to: '/dashboard/admin/applications' },
-      { icon: '👥', label: 'Manage Accounts', description: 'Suspend, block, reactivate, or deactivate accounts', to: '/dashboard/admin/accounts' },
+      { icon: <ClipboardCheck size={24} />, label: 'Review Applications', description: 'Approve or decline pending professional applications', to: '/dashboard/admin/applications' },
+      { icon: <Users size={24} />, label: 'Manage Accounts', description: 'Suspend, block, reactivate, or deactivate accounts', to: '/dashboard/admin/accounts' },
     ];
   }
   // Student
   return [
-    { icon: '🖥️', label: 'SharedDrive', description: 'Access resources from your tutors & coaches', to: '/dashboard/shared-drive' },
-    { icon: '🎯', label: 'Learning Zone', description: 'Plan your year, log results, submit work', to: '/dashboard/learning-zone' },
-    { icon: '✨', label: 'AI Insights', description: 'Get summaries & insights from your materials', to: '/dashboard/ai-insights' },
-    { icon: '👤', label: 'My Profile', description: 'Update your profile & preferences', to: '/dashboard/profile' },
+    { icon: <HardDrive size={24} />, label: 'SharedDrive', description: 'Access resources from your tutors & coaches', to: '/dashboard/shared-drive' },
+    { icon: <Target size={24} />, label: 'Learning Zone', description: 'Plan your year, log results, submit work', to: '/dashboard/learning-zone' },
+    { icon: <Sparkles size={24} />, label: 'AI Insights', description: 'Get summaries & insights from your materials', to: '/dashboard/ai-insights' },
+    { icon: <User size={24} />, label: 'My Profile', description: 'Update your profile & preferences', to: '/dashboard/profile' },
   ];
 }
 
@@ -197,10 +199,10 @@ export default function DashboardHome() {
     getAdminDashboardStats().then((s) => {
       if (cancelled) return;
       setAdminStats([
-        { icon: '📥', value: String(s.pendingApplications), label: 'Pending Applications', to: '/dashboard/admin/applications' },
-        { icon: '👥', value: String(s.totalAccounts), label: 'Total Accounts', to: '/dashboard/admin/accounts' },
-        { icon: '✅', value: String(s.approvedProfessionals), label: 'Approved Professionals', to: '/dashboard/admin/accounts' },
-        { icon: '🚫', value: String(s.suspendedOrBlocked), label: 'Suspended / Blocked', to: '/dashboard/admin/accounts' },
+        { icon: <ClipboardCheck size={24} />, value: String(s.pendingApplications), label: 'Pending Applications', to: '/dashboard/admin/applications' },
+        { icon: <Users size={24} />, value: String(s.totalAccounts), label: 'Total Accounts', to: '/dashboard/admin/accounts' },
+        { icon: <Users size={24} />, value: String(s.approvedProfessionals), label: 'Approved Professionals', to: '/dashboard/admin/accounts' },
+        { icon: <Users size={24} />, value: String(s.suspendedOrBlocked), label: 'Suspended / Blocked', to: '/dashboard/admin/accounts' },
       ]);
     });
 
@@ -293,7 +295,7 @@ export default function DashboardHome() {
                   (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
                 }}
               >
-                <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>{action.icon}</span>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: `var(--zone-${zone})` }}>{action.icon}</span>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.2rem' }}>
                     {action.label}

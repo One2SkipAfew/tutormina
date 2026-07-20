@@ -6,6 +6,7 @@ import { getOrCreateConversation, sendMessage } from '../../lib/messaging';
 import { getRoleDisplayName } from '../../types/lms';
 import type { Profile, ProviderDetails } from '../../types/lms';
 import BookingCalendarModal from '../../components/directory/BookingCalendarModal';
+import { Calendar, Video, Link, MessageCircle, Edit2 } from 'lucide-react';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   pending: { bg: '#fef7e0', color: '#b06000' },
@@ -140,9 +141,23 @@ export default function MyBookings() {
         )}
 
         {b.status === 'confirmed' && (
-          b.meeting_link ? (
-            <a href={b.meeting_link} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }}>
-              🔗 Join Call
+          b.use_video_room ? (
+            b.video_room_id ? (
+              <button 
+                className="btn btn-primary btn-sm" 
+                style={{ alignSelf: 'flex-start', background: 'linear-gradient(135deg, var(--color-primary), var(--color-spring-dark))', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }} 
+                onClick={() => navigate(`/dashboard/video-room/${b.video_room_id}`)}
+              >
+                <Video size={16} /> Join Video Room
+              </button>
+            ) : (
+              <div style={{ fontSize: '0.8rem', color: '#b06000', background: '#fef7e0', padding: '0.4rem 0.8rem', borderRadius: '8px', alignSelf: 'flex-start' }}>
+                Video room is being prepared...
+              </div>
+            )
+          ) : b.meeting_link ? (
+            <a href={b.meeting_link} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Link size={16} /> Join Call
             </a>
           ) : addingLinkFor === b.id ? (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -185,10 +200,10 @@ export default function MyBookings() {
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-outline btn-sm" onClick={() => handleMessage(b.provider_id)}>💬 Message</button>
+            <button className="btn btn-outline btn-sm" onClick={() => handleMessage(b.provider_id)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><MessageCircle size={14} /> Message</button>
             {isUpcomingActive && (
               <>
-                <button className="btn btn-outline btn-sm" onClick={() => handleOpenEdit(b)}>✏️ Edit</button>
+                <button className="btn btn-outline btn-sm" onClick={() => handleOpenEdit(b)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Edit2 size={14} /> Edit</button>
                 <button className="btn btn-outline btn-sm" style={{ color: '#c5221f', borderColor: '#f3b3ac' }} onClick={() => setCancelingId(b.id)}>
                   Cancel
                 </button>
@@ -204,7 +219,7 @@ export default function MyBookings() {
     <div className="animate-slide-up">
       <div className="dashboard-page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 className="dashboard-page-title">📅 My Bookings</h1>
+          <h1 className="dashboard-page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Calendar size={32} color="#2196F3" /> My Bookings</h1>
           <p className="dashboard-page-subtitle">Your upcoming and past sessions with tutors and coaches.</p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/directory')}>
@@ -220,7 +235,7 @@ export default function MyBookings() {
         <div className="content-panel">
           <div className="content-panel-body">
             <div className="empty-state">
-              <div className="empty-state-icon">📅</div>
+              <div className="empty-state-icon"><Calendar size={48} /></div>
               <div className="empty-state-title">You haven't booked a session yet</div>
               <div className="empty-state-text">Browse the directory to find a tutor or coach and book your first session.</div>
               <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/directory')}>

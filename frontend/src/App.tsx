@@ -23,6 +23,8 @@ import DirectoryProfile from './pages/DirectoryProfile';
 import ProviderCalendar from './pages/dashboard/ProviderCalendar';
 import MyBookings from './pages/dashboard/MyBookings';
 import LearningZone from './pages/dashboard/LearningZone';
+import LiveSession from './pages/dashboard/LiveSession';
+import VideoRoom from './pages/dashboard/VideoRoom';
 import './index.css';
 
 function PublicNav() {
@@ -137,6 +139,9 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="ai-insights" element={<AIInsights />} />
+            <Route path="live-session" element={<LiveSession />} />
+            <Route path="live-session/:bookingId" element={<LiveSession />} />
+            <Route path="video-room/:roomId" element={<VideoRoom />} />
             <Route path="admin/applications" element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminApplications />

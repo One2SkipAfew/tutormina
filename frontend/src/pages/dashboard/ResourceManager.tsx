@@ -164,10 +164,7 @@ export default function ResourceManager() {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px',
-    border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: '0.85rem',
-  };
+
 
   return (
     <div className="animate-slide-up">

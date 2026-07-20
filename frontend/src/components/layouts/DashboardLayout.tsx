@@ -84,6 +84,11 @@ const Icons = {
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
     </svg>
   ),
+  Radio: () => (
+    <svg className="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="2" /><path d="M16.24 7.76a6 6 0 0 1 0 8.49" /><path d="M7.76 16.24a6 6 0 0 1 0-8.49" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M4.93 19.07a10 10 0 0 1 0-14.14" />
+    </svg>
+  ),
 };
 
 interface NavItem {
@@ -124,6 +129,7 @@ export default function DashboardLayout() {
         { to: '/dashboard/resources', label: 'My Resources', icon: Icons.Folder },
         { to: '/dashboard/students', label: 'My Students', icon: Icons.Users },
         { to: '/dashboard/calendar', label: 'My Calendar', icon: Icons.Calendar },
+        { to: '/dashboard/live-session', label: 'Live Session', icon: Icons.Radio },
         { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
       ];
     }
@@ -132,6 +138,7 @@ export default function DashboardLayout() {
     return [
       ...common,
       { to: '/dashboard/bookings', label: 'My Bookings', icon: Icons.Calendar },
+      { to: '/dashboard/live-session', label: 'Live Session', icon: Icons.Radio },
       { to: '/dashboard/learning-zone', label: 'Learning Zone', icon: Icons.BarChart },
       { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
     ];

@@ -13,13 +13,24 @@ import {
   type MyTutor,
 } from '../../lib/learningZone';
 import { uploadStudentDocument } from '../../lib/studentDetails';
+import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send } from 'lucide-react';
 
 const EVENT_TYPE_LABELS: Record<LearningEvent['event_type'], string> = {
-  benchmark: '🎯 Benchmark',
-  deadline: '⏰ Deadline',
-  submission: '📤 Submission',
-  test: '📝 Test',
-  exam: '📚 Exam',
+  benchmark: 'Benchmark',
+  deadline: 'Deadline',
+  submission: 'Submission',
+  test: 'Test',
+  exam: 'Exam',
+};
+
+const getEventIcon = (type: LearningEvent['event_type'], size = 16) => {
+  switch (type) {
+    case 'benchmark': return <Target size={size} />;
+    case 'deadline': return <Clock size={size} />;
+    case 'submission': return <Upload size={size} />;
+    case 'test': return <FileText size={size} />;
+    case 'exam': return <BookOpen size={size} />;
+  }
 };
 
 export default function LearningZone() {
@@ -136,7 +147,9 @@ export default function LearningZone() {
   return (
     <div className="animate-slide-up">
       <div className="dashboard-page-header">
-        <h1 className="dashboard-page-title">🎯 Learning Zone</h1>
+        <h1 className="dashboard-page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Target size={32} color="#2196F3" /> Learning Zone
+        </h1>
         <p className="dashboard-page-subtitle">Plan your year, track results, and submit work to your tutors and coaches.</p>
       </div>
 
@@ -144,17 +157,17 @@ export default function LearningZone() {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}>🔥</div></div>
+          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}><Flame size={24} /></div></div>
           <div className="stat-card-value">{loading ? '—' : streak}</div>
           <div className="stat-card-label">Week Streak</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}>📋</div></div>
+          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}><ClipboardList size={24} /></div></div>
           <div className="stat-card-value">{loading ? '—' : upcoming.length}</div>
           <div className="stat-card-label">Upcoming Items</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}>✅</div></div>
+          <div className="stat-card-header"><div className={`stat-card-icon ${zone}`}><CheckCircle size={24} /></div></div>
           <div className="stat-card-value">{loading ? '—' : completed.length}</div>
           <div className="stat-card-label">Logged Results</div>
         </div>
@@ -163,7 +176,7 @@ export default function LearningZone() {
       {/* Plan */}
       <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
         <div className="content-panel-header" style={{ display: 'block' }}>
-          <h3 className="content-panel-title">📅 Plan Your Year</h3>
+          <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CalendarIcon size={20} /> Plan Your Year</h3>
           <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Add benchmarks, deadlines, submission dates, and test/exam dates.</p>
         </div>
         <div className="content-panel-body">
@@ -194,7 +207,9 @@ export default function LearningZone() {
               {upcoming.map((ev) => (
                 <div key={ev.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.7rem 0', borderBottom: '1px solid #f2f4f6' }}>
                   <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{EVENT_TYPE_LABELS[ev.event_type]} — {ev.title}</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {getEventIcon(ev.event_type)} {EVENT_TYPE_LABELS[ev.event_type]} — {ev.title}
+                    </div>
                     <div style={{ fontSize: '0.78rem', color: '#666' }}>
                       {ev.event_date ? new Date(ev.event_date + 'T00:00:00').toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'No date set'}
                       {ev.description ? ` • ${ev.description}` : ''}
@@ -238,7 +253,7 @@ export default function LearningZone() {
       {/* Results */}
       <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
         <div className="content-panel-header">
-          <h3 className="content-panel-title">📈 Results &amp; Progress</h3>
+          <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><TrendingUp size={20} /> Results &amp; Progress</h3>
         </div>
         <div className="content-panel-body">
           {completed.length === 0 ? (
@@ -246,7 +261,9 @@ export default function LearningZone() {
           ) : (
             completed.map((ev) => (
               <div key={ev.id} style={{ padding: '0.7rem 0', borderBottom: '1px solid #f2f4f6' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{EVENT_TYPE_LABELS[ev.event_type]} — {ev.title}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {getEventIcon(ev.event_type)} {EVENT_TYPE_LABELS[ev.event_type]} — {ev.title}
+                </div>
                 <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.15rem' }}>
                   {ev.result_text && <strong>{ev.result_text}</strong>}
                   {ev.result_file_url && <> &middot; <a href={ev.result_file_url} target="_blank" rel="noopener noreferrer">View file</a></>}
@@ -260,7 +277,7 @@ export default function LearningZone() {
       {/* Submit work */}
       <div className="content-panel">
         <div className="content-panel-header" style={{ display: 'block' }}>
-          <h3 className="content-panel-title">📤 Submit Work to a Tutor</h3>
+          <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Send size={20} /> Submit Work to a Tutor</h3>
           <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Only the tutor or coach you choose will be able to see this file.</p>
         </div>
         <div className="content-panel-body">

@@ -186,6 +186,82 @@ export interface Booking {
   proposed_session_date: string | null;
   proposed_duration_minutes: number | null;
   cancellation_reason: string | null;
+  use_video_room: boolean;
+  video_room_id: string | null;
+  created_at: string;
+}
+
+export type VideoRoomStatus = 'waiting' | 'active' | 'ended';
+
+export interface VideoRoom {
+  id: string;
+  booking_id: string | null;
+  host_id: string;
+  room_name: string;
+  daily_room_url: string | null;
+  daily_room_name: string | null;
+  status: VideoRoomStatus;
+  started_at: string | null;
+  ended_at: string | null;
+  recording_url: string | null;
+  created_at: string;
+}
+
+export interface SessionTranscript {
+  id: string;
+  video_room_id: string | null;
+  booking_id: string | null;
+  speaker_id: string | null;
+  speaker_label: string | null;
+  text: string;
+  start_time: number;
+  end_time: number;
+  is_final: boolean;
+  created_at: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  video_room_id: string | null;
+  booking_id: string | null;
+  created_by: string | null;
+  summary_text: string;
+  key_topics: string[] | null;
+  insights: string[] | null;
+  action_items: string[] | null;
+  duration_seconds: number | null;
+  transcript_word_count: number | null;
+  created_at: string;
+}
+
+export type FactCheckVerdict = 'TRUE' | 'FALSE' | 'MISLEADING' | 'UNVERIFIABLE';
+
+export interface FactCheckRecord {
+  id: string;
+  video_room_id: string | null;
+  booking_id: string | null;
+  claim_text: string;
+  speaker_label: string | null;
+  category: string | null;
+  verdict: FactCheckVerdict;
+  confidence_score: number;
+  explanation: string | null;
+  key_evidence: string | null;
+  source_urls: string[] | null;
+  used_web_search: boolean;
+  checked_against_resources: boolean;
+  created_at: string;
+}
+
+export interface LiveSession {
+  id: string;
+  user_id: string;
+  title: string;
+  transcript_text: string | null;
+  ai_notes: string | null;
+  meeting_package: string | null;
+  audio_path: string | null;
+  duration_seconds: number;
   created_at: string;
 }
 

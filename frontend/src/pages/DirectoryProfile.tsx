@@ -26,7 +26,7 @@ export default function DirectoryProfile() {
     async function fetchProfile() {
       if (!id) return;
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*, provider_details(*)')
         .eq('id', id)
