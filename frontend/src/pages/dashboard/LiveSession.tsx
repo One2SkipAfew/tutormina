@@ -7,12 +7,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-import { useAuth } from '../../contexts/AuthContext';
-import { useRealtimeTranscript } from '../../lib/useRealtimeTranscript';
-import { useFactChecker } from '../../lib/useFactChecker';
-import { generateLiveNotes, summariseSession } from '../../lib/aiApi';
-import { supabase } from '../../lib/supabaseClient';
-import { saveSessionNote } from '../../lib/aiNotes';
+
+import { useAILivestream } from '../../contexts/AILivestreamContext';
 import { Radio, Mic, Play, Pause, Square, FileText, Sparkles, Loader, RefreshCw, Shield, Search, Package, Save, CheckCircle, XCircle, AlertTriangle, HelpCircle } from 'lucide-react';
 import '../../styles/live-session.css';
 
@@ -37,27 +33,25 @@ const VERDICT_CONFIG: Record<string, { color: string; bg: string; label: string 
 };
 
 export default function LiveSession() {
-  const { profile } = useAuth();
-
-  // Transcription
-  const transcript = useRealtimeTranscript();
-
-  // Fact checking
-  const factChecker = useFactChecker();
-
-  // AI Notes
-  const [aiNotes, setAiNotes] = useState('');
-  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
-
-  // Session Summary
-  const [sessionSummary, setSessionSummary] = useState('');
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  
+  const {
+    transcript,
+    factChecker,
+    aiNotes,
+    isGeneratingNotes,
+    sessionSummary,
+    isGeneratingSummary,
+    showSummaryModal,
+    setShowSummaryModal,
+    isSaving,
+    saved,
+    generateNotes,
+    endAndSummarise,
+    saveSession
+  } = useAILivestream();
 
   // UI State
   const [expandedClaim, setExpandedClaim] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -66,85 +60,12 @@ export default function LiveSession() {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript.transcriptEntries, transcript.interimText]);
 
-  // --- AI Notes Generation ---
-  const generateNotes = useCallback(async () => {
-    const fullTranscript = transcript.getFullTranscript();
-    if (!fullTranscript.trim() || fullTranscript.split(/\s+/).length < 20) return;
-
-    setIsGeneratingNotes(true);
-    try {
-      const response = await generateLiveNotes(fullTranscript);
-      setAiNotes(response.result);
-    } catch (err) {
-      console.error('AI notes error:', err);
-    } finally {
-      setIsGeneratingNotes(false);
-    }
-  }, [transcript]);
-
-  // --- Fact Check ---
+  // --- Fact Check (Still runs locally if needed, but uses context factChecker) ---
   const runFactCheck = useCallback(async () => {
     const fullTranscript = transcript.getFullTranscript();
     if (!fullTranscript.trim()) return;
     await factChecker.checkTranscript(fullTranscript);
   }, [transcript, factChecker]);
-
-  // --- End & Summarise ---
-  const endAndSummarise = useCallback(async () => {
-    transcript.stop();
-    const fullTranscript = transcript.getFullTranscript();
-    if (!fullTranscript.trim()) return;
-
-    setIsGeneratingSummary(true);
-    try {
-      const response = await summariseSession({
-        transcript: fullTranscript,
-        aiNotes,
-        factCheckResults: factChecker.results,
-        durationSeconds: transcript.duration,
-      });
-      setSessionSummary(response.summary);
-      setShowSummaryModal(true);
-    } catch (err) {
-      console.error('Summary error:', err);
-    } finally {
-      setIsGeneratingSummary(false);
-    }
-  }, [transcript, aiNotes, factChecker.results]);
-
-  // --- Save Session ---
-  const saveSession = useCallback(async () => {
-    if (!profile) return;
-    setIsSaving(true);
-
-    try {
-      // Save to live_sessions table
-      const { error } = await supabase.from('live_sessions').insert({
-        user_id: profile.id,
-        title: `Live Session — ${new Date().toLocaleString()}`,
-        transcript_text: transcript.getFullTranscript(),
-        ai_notes: aiNotes,
-        meeting_package: sessionSummary,
-        duration_seconds: transcript.duration,
-      });
-      if (error) throw error;
-
-      // Also save as an AI session note
-      await saveSessionNote({
-        title: `Live Session — ${new Date().toLocaleDateString()}`,
-        transcript: transcript.getFullTranscript(),
-        summary: sessionSummary || aiNotes,
-        key_topics: [],
-      });
-
-      setSaved(true);
-    } catch (err) {
-      console.error('Save error:', err);
-      alert('Failed to save session.');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [profile, transcript, aiNotes, sessionSummary]);
 
   // --- Simple Markdown Renderer ---
   const renderMarkdown = (md: string): string => {
@@ -189,11 +110,7 @@ export default function LiveSession() {
             <h2>Live Session</h2>
           </div>
           <StatusBadge />
-          {transcript.method !== 'none' && (
-            <span style={{ fontSize: '0.6rem', color: '#94a3b8', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px' }}>
-              {transcript.method === 'deepgram' ? '🎯 Deepgram' : '🌐 Web Speech'}
-            </span>
-          )}
+
         </div>
 
         <div className="ls-header-right">

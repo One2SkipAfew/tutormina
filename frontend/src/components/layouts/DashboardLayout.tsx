@@ -3,6 +3,8 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor, getZoneLabel, getRoleDisplayName } from '../../types/lms';
 import NotificationBell from '../shared/NotificationBell';
+import { AILivestreamProvider } from '../../contexts/AILivestreamContext';
+import ActiveRecordingWidget from '../ActiveRecordingWidget';
 import '../../styles/dashboard.css';
 
 // SVG Icons as inline components
@@ -97,7 +99,7 @@ interface NavItem {
   icon: React.FC;
 }
 
-export default function DashboardLayout() {
+function DashboardLayoutInner() {
   const { profile, providerDetails, signOut, isParentMode, toggleParentMode } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -289,5 +291,14 @@ export default function DashboardLayout() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout() {
+  return (
+    <AILivestreamProvider>
+      <DashboardLayoutInner />
+      <ActiveRecordingWidget />
+    </AILivestreamProvider>
   );
 }

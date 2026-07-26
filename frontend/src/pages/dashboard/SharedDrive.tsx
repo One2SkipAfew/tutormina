@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFolders, getFiles } from '../../lib/sharedDrive';
+import { getSessionNotes } from '../../lib/aiNotes';
 import { getZoneColor, formatFileSize } from '../../types/lms';
 import type { Folder, SharedFile, FileType } from '../../types/lms';
 import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic, Monitor, Search, Loader, Folder as FolderIcon, GraduationCap, Users, BookMarked, Sparkles, Download, Paperclip } from 'lucide-react';
@@ -47,16 +48,39 @@ export default function SharedDrive() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [folderData, fileData] = await Promise.all([
-        getFolders(currentFolderId),
-        getFiles({
-          folderId: currentFolderId,
-          fileType: activeFilter || undefined,
-          search: searchQuery || undefined,
-        }),
-      ]);
-      setFolders(folderData);
-      setFiles(fileData);
+      if (currentFolderId === 'ai-notes') {
+        const notes = await getSessionNotes();
+        setFolders([]);
+        setFiles(notes.map(n => ({
+          id: n.id,
+          title: n.title,
+          description: n.summary ? n.summary.substring(0, 100) + '...' : 'AI Session Notes',
+          file_type: 'document',
+          file_url: '',
+          file_size_bytes: 0,
+          folder_id: 'ai-notes',
+          owner_id: n.profile_id,
+          uploader_name: 'AI Assistant',
+          uploader_role: 'system',
+          created_at: n.created_at,
+          visibility: 'private',
+          ai_summary: n.summary,
+          ai_key_topics: n.key_topics,
+          _aiNote: n
+        } as any)));
+      } else {
+        const [folderData, fileData] = await Promise.all([
+          getFolders(currentFolderId),
+          getFiles({
+            folderId: currentFolderId,
+            fileType: activeFilter || undefined,
+            search: searchQuery || undefined,
+          }),
+        ]);
+        
+        setFolders(folderData);
+        setFiles(fileData);
+      }
     } catch (err) {
       console.error('Failed to load shared drive:', err);
     } finally {
@@ -116,12 +140,28 @@ export default function SharedDrive() {
         {FILE_TYPE_FILTERS.map(f => (
           <button
             key={f.value}
-            className={`drive-filter-chip ${activeFilter === f.value ? 'active' : ''}`}
-            onClick={() => setActiveFilter(f.value as FileType | '')}
+            className={`drive-filter-chip ${activeFilter === f.value && currentFolderId !== 'ai-notes' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveFilter(f.value as FileType | '');
+              if (currentFolderId === 'ai-notes') {
+                setCurrentFolderId(null);
+                setFolderPath([{ id: null, name: 'SharedDrive' }]);
+              }
+            }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{f.icon} {f.label}</span>
           </button>
         ))}
+        <button
+          className={`drive-filter-chip ${currentFolderId === 'ai-notes' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveFilter('');
+            setCurrentFolderId('ai-notes');
+            setFolderPath([{ id: null, name: 'SharedDrive' }, { id: 'ai-notes', name: 'AI Insights & Summaries' }]);
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Sparkles size={16} /> AI Insights & Summaries</span>
+        </button>
       </div>
 
       {/* Controls */}
@@ -132,13 +172,24 @@ export default function SharedDrive() {
               <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 {i > 0 && <span className="drive-path-separator">›</span>}
                 <span
-                  className={`drive-path-item ${i === folderPath.length - 1 ? 'current' : ''}`}
-                  onClick={() => navigateToBreadcrumb(i)}
+                  className={`drive-path-item ${i === folderPath.length - 1 && !activeFilter ? 'current' : ''}`}
+                  onClick={() => {
+                    navigateToBreadcrumb(i);
+                    setActiveFilter('');
+                  }}
                 >
                   {crumb.name}
                 </span>
               </span>
             ))}
+            {activeFilter && currentFolderId !== 'ai-notes' && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span className="drive-path-separator">›</span>
+                <span className="drive-path-item current">
+                  {FILE_TYPE_FILTERS.find(f => f.value === activeFilter)?.label}
+                </span>
+              </span>
+            )}
           </div>
         </div>
         <div className="drive-controls-right">
@@ -222,16 +273,18 @@ export default function SharedDrive() {
             </div>
             <div className="upload-modal-body">
               {/* File Info */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem',
-                fontSize: '0.85rem', marginBottom: '1.25rem',
-              }}>
-                <div><strong>Type:</strong> {selectedFile.file_type.replace('_', ' ')}</div>
-                <div><strong>Size:</strong> {formatFileSize(selectedFile.file_size_bytes)}</div>
-                <div><strong>Uploaded by:</strong> {selectedFile.uploader_name}</div>
-                <div><strong>Date:</strong> {new Date(selectedFile.created_at).toLocaleDateString()}</div>
-                <div><strong>Visibility:</strong> {selectedFile.visibility.replace('_', ' ')}</div>
-              </div>
+              {(selectedFile.file_size_bytes ?? 0) > 0 && (
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem',
+                  fontSize: '0.85rem', marginBottom: '1.25rem',
+                }}>
+                  <div><strong>Type:</strong> {selectedFile.file_type.replace('_', ' ')}</div>
+                  <div><strong>Size:</strong> {formatFileSize(selectedFile.file_size_bytes)}</div>
+                  <div><strong>Uploaded by:</strong> {selectedFile.uploader_name}</div>
+                  <div><strong>Date:</strong> {new Date(selectedFile.created_at).toLocaleDateString()}</div>
+                  <div><strong>Visibility:</strong> {selectedFile.visibility.replace('_', ' ')}</div>
+                </div>
+              )}
 
               {selectedFile.description && (
                 <div style={{ marginBottom: '1.25rem' }}>
@@ -262,6 +315,18 @@ export default function SharedDrive() {
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sparkles size={14} /> Summarise</button>
                   <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Search size={14} /> Extract Topics</button>
+                </div>
+              )}
+
+              {/* Full Transcript for AI Notes */}
+              {(selectedFile as any)._aiNote && (
+                <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#1e293b' }}>
+                    <FileText size={16} /> Full Transcript
+                  </h4>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', maxHeight: '300px', overflowY: 'auto', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+                    {(selectedFile as any)._aiNote.transcript || 'No transcript available.'}
+                  </div>
                 </div>
               )}
             </div>

@@ -21,7 +21,11 @@ export default function Messages() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(searchParams.get('c'));
   const [messages, setMessages] = useState<Message[]>([]);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => {
+    return searchParams.get('template') === 'intro' 
+      ? 'Hi there! Thanks for viewing my profile. I offer a free 15-minute intro call if you would like to discuss how I can help you achieve your goals. You can book it directly from my profile.' 
+      : '';
+  });
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState<string | null>(null);

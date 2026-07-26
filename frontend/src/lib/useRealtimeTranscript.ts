@@ -66,7 +66,7 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<any>(null);
   const durationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recognitionRef = useRef<any>(null);
   const isPausedRef = useRef(false);
@@ -134,38 +134,43 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
 
       return new Promise((resolve) => {
         const timeout = setTimeout(() => {
+          if (wsRef.current === ws) wsRef.current = null;
           ws.close();
           cleanupAudio();
           resolve(false);
         }, 5000);
 
-        ws.onopen = () => {
+        ws.onopen = async () => {
           clearTimeout(timeout);
           setConnectionStatus('connected');
           setMethod('deepgram');
 
-          // Audio pipeline: capture PCM and send to server
-          const audioContext = new AudioContext({ sampleRate: 16000 });
-          audioContextRef.current = audioContext;
-          const source = audioContext.createMediaStreamSource(stream);
-          const processor = audioContext.createScriptProcessor(4096, 1, 1);
-          processorRef.current = processor;
+          try {
+            // Audio pipeline: capture PCM and send to server
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+            audioContextRef.current = audioContext;
+            const source = audioContext.createMediaStreamSource(stream);
+            
+            await audioContext.audioWorklet.addModule('/audio-processor.js');
+            const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+            processorRef.current = processor;
 
-          processor.onaudioprocess = (e) => {
-            if (ws.readyState === WebSocket.OPEN && !isPausedRef.current) {
-              const inputData = e.inputBuffer.getChannelData(0);
-              const pcmData = new Int16Array(inputData.length);
-              for (let i = 0; i < inputData.length; i++) {
-                const s = Math.max(-1, Math.min(1, inputData[i]));
-                pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            processor.port.onmessage = (e) => {
+              if (ws.readyState === WebSocket.OPEN && !isPausedRef.current) {
+                ws.send(e.data);
               }
-              ws.send(pcmData.buffer);
-            }
-          };
+            };
 
-          source.connect(processor);
-          processor.connect(audioContext.destination);
-          resolve(true);
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+            resolve(true);
+          } catch (err) {
+            console.error('AudioWorklet initialization failed:', err);
+            if (wsRef.current === ws) wsRef.current = null;
+            ws.close();
+            cleanupAudio();
+            resolve(false);
+          }
         };
 
         ws.onmessage = (event) => {
@@ -197,12 +202,20 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
 
         ws.onerror = () => {
           clearTimeout(timeout);
-          setConnectionStatus('error');
+          if (wsRef.current === ws) wsRef.current = null;
+          cleanupAudio();
           resolve(false);
         };
 
         ws.onclose = () => {
+          if (wsRef.current !== ws) return;
           setConnectionStatus('disconnected');
+          setIsListening(false);
+          if (durationTimerRef.current) {
+            clearInterval(durationTimerRef.current);
+            durationTimerRef.current = null;
+          }
+          cleanupAudio();
         };
       });
     } catch {
@@ -247,6 +260,7 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error, event.message);
       if (event.error !== 'no-speech') {
         setConnectionStatus('error');
       }
@@ -264,6 +278,7 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
       recognitionRef.current = recognition;
       setConnectionStatus('connected');
       setMethod('webspeech');
+      setIsListening(true);
       return true;
     } catch {
       return false;
@@ -278,6 +293,9 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
     // Try Deepgram first, fallback to Web Speech API
     const deepgramOk = await startDeepgram();
     if (!deepgramOk) {
+      console.log('Deepgram failed, falling back to Web Speech API...');
+      // Small delay to allow the OS to fully release the microphone hardware lock
+      await new Promise(r => setTimeout(r, 500));
       const webSpeechOk = startWebSpeech();
       if (!webSpeechOk) {
         setConnectionStatus('error');
@@ -288,6 +306,7 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
 
     // Start duration timer
     durationTimerRef.current = setInterval(() => {
+      if (isPausedRef.current) return;
       setDuration(prev => {
         if (prev >= MAX_DURATION_SECONDS) {
           stop();

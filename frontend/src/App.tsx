@@ -12,6 +12,7 @@ import ResourceManager from './pages/dashboard/ResourceManager';
 import MyStudents from './pages/dashboard/MyStudents';
 import AIInsights from './pages/dashboard/AIInsights';
 import Messages from './pages/dashboard/Messages';
+import ProfileVisits from './pages/dashboard/ProfileVisits';
 import VettingApplication from './pages/VettingApplication';
 import ApplicationStatus from './pages/ApplicationStatus';
 import AdminApplications from './pages/dashboard/admin/Applications';
@@ -130,6 +131,11 @@ function App() {
             <Route path="calendar" element={
               <ProtectedRoute allowedRoles={['tutor', 'coach', 'admin']}>
                 <ProviderCalendar />
+              </ProtectedRoute>
+            } />
+            <Route path="profile-visits" element={
+              <ProtectedRoute allowedRoles={['tutor', 'coach']}>
+                <ProfileVisits />
               </ProtectedRoute>
             } />
             <Route path="bookings" element={<MyBookings />} />

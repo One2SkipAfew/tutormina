@@ -13,7 +13,7 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
   const { session, profile, providerDetails, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (loading || (session && !profile)) {
     return (
       <div style={{
         display: 'flex',
@@ -50,6 +50,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
         !providerDetails?.application_submitted_at;
 
       return <Navigate to={isUnsubmittedApplication ? '/vetting-application' : '/application-status'} replace />;
+    } else if ((profile.role === 'tutor' || profile.role === 'coach')) {
+      const hasSeenWelcome = localStorage.getItem(`welcome_seen_${profile.id}`);
+      if (!hasSeenWelcome) {
+        return <Navigate to="/application-status" replace />;
+      }
     }
   }
 

@@ -1,12 +1,26 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
+  const { session } = useAuth();
+
+  if (session) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="animate-fade-in">
       {/* Section 1: Welcome / Hero */}
       <section className="section" style={{ paddingTop: '8rem', paddingBottom: '8rem' }}>
         <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <img src="/logo.png" alt="TutorMina Logo" style={{ width: '200px', height: 'auto', marginBottom: '2rem' }} />
+          <img src="/logo.png" alt="TutorMina Logo" style={{ 
+            width: '200px', 
+            height: 'auto', 
+            marginBottom: '2rem', 
+            mixBlendMode: 'multiply',
+            WebkitMaskImage: 'radial-gradient(circle, black 40%, transparent 70%)',
+            maskImage: 'radial-gradient(circle, black 40%, transparent 70%)'
+          }} />
           <h1 style={{ color: 'var(--color-olive-dark)', fontSize: '3.5rem', marginBottom: '1rem' }}>
             Grow with TutorMina
           </h1>
@@ -41,7 +55,7 @@ export default function Home() {
               <h3 style={{ color: 'var(--color-beige-dark)', fontSize: '1.5rem', borderBottom: '2px solid var(--color-tan-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
                 🤝 Professional Coaching
               </h3>
-              <p style={{ marginBottom: '1rem' }}><strong>Behavioural Coaches:</strong> Holistic, experienced life coaches dedicated to personal growth and overcoming challenges.</p>
+              <p style={{ marginBottom: '1rem' }}><strong>Behavioural Coaches:</strong> Holistic, experienced life coaches dedicated to personal growth and overcoming career challenges. Career coaching and career guidance. Identifying and highlighting skillsets, bringing them to the fore and advising appropriately.</p>
               <p><strong>Executive Coaches:</strong> Previous executives coaching prospective employees on the best techniques and methods to land executive positions, including careers in MBB management consulting companies.</p>
             </div>
           </div>

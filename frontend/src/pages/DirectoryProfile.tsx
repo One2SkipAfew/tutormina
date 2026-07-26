@@ -14,12 +14,13 @@ interface FullProfile extends Profile {
 export default function DirectoryProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, profile: currentUser } = useAuth();
   const [profile, setProfile] = useState<FullProfile | null>(null);
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([]);
   const [referenceCount, setReferenceCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingType, setBookingType] = useState<'session' | 'intro_call'>('session');
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   useEffect(() => {
@@ -40,11 +41,23 @@ export default function DirectoryProfile() {
         ]);
         setWorkExperiences(we);
         setReferenceCount(refCount ?? 0);
+
+        // Track profile visit if visitor is a customer
+        if (currentUser && currentUser.role === 'customer' && currentUser.id !== id) {
+          try {
+            await supabase.from('profile_visits').insert({
+              visitor_id: currentUser.id,
+              provider_id: id
+            });
+          } catch (err) {
+            // ignore unique constraint violations silently
+          }
+        }
       }
       setLoading(false);
     }
     fetchProfile();
-  }, [id]);
+  }, [id, currentUser]);
 
   if (loading) {
     return <div style={{ padding: '4rem', textAlign: 'center' }}>Loading profile...</div>;
@@ -61,10 +74,11 @@ export default function DirectoryProfile() {
 
   const details = profile.provider_details;
 
-  const handleBookClick = () => {
+  const handleBookClick = (type: 'session' | 'intro_call' = 'session') => {
     if (!session) {
       setShowAuthPrompt(true);
     } else {
+      setBookingType(type);
       setShowBookingModal(true);
     }
   };
@@ -112,9 +126,16 @@ export default function DirectoryProfile() {
             <button
               className="btn btn-primary" 
               style={{ width: '100%', marginBottom: '1rem' }}
-              onClick={handleBookClick}
+              onClick={() => handleBookClick('session')}
             >
               Book Session
+            </button>
+            <button
+              className="btn btn-outline" 
+              style={{ width: '100%', marginBottom: '1rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary-dark)' }}
+              onClick={() => handleBookClick('intro_call')}
+            >
+              ☕ Book Intro Call
             </button>
           </div>
 
@@ -191,7 +212,7 @@ export default function DirectoryProfile() {
       </div>
 
       {showBookingModal && (
-        <BookingCalendarModal provider={profile} onClose={() => setShowBookingModal(false)} />
+        <BookingCalendarModal provider={profile} bookingType={bookingType} onClose={() => setShowBookingModal(false)} />
       )}
 
       {/* Auth Prompt Modal */}

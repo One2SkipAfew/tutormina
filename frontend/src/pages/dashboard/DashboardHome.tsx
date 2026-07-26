@@ -10,7 +10,7 @@ import { getLearningStreak } from '../../lib/learningZone';
 import { supabase } from '../../lib/supabaseClient';
 import SessionCompletionPrompt from '../../components/shared/SessionCompletionPrompt';
 
-import { Users, BookOpen, Calendar, Clock, MessageCircle, Target, Trophy, UploadCloud, HardDrive, Sparkles, ClipboardCheck, User } from 'lucide-react';
+import { Users, BookOpen, Calendar, Clock, MessageCircle, Target, Trophy, UploadCloud, HardDrive, Sparkles, ClipboardCheck, User, Eye } from 'lucide-react';
 
 interface StatItem {
   icon: React.ReactNode;
@@ -104,6 +104,7 @@ function getQuickActionsForRole(role: UserRole): QuickAction[] {
       { icon: <UploadCloud size={24} />, label: 'Upload Resources', description: 'Share notes, past papers, or course material', to: '/dashboard/resources' },
       { icon: <HardDrive size={24} />, label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
       { icon: <Users size={24} />, label: 'My Students', description: 'View and manage your students', to: '/dashboard/students' },
+      { icon: <Eye size={24} />, label: 'Profile Visits', description: 'See who has viewed your profile', to: '/dashboard/profile-visits' },
       { icon: <Sparkles size={24} />, label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
     ];
   }
@@ -112,6 +113,7 @@ function getQuickActionsForRole(role: UserRole): QuickAction[] {
       { icon: <UploadCloud size={24} />, label: 'Upload Resources', description: 'Share coaching materials & recordings', to: '/dashboard/resources' },
       { icon: <HardDrive size={24} />, label: 'SharedDrive', description: 'Browse & share collaborative resources', to: '/dashboard/shared-drive' },
       { icon: <Users size={24} />, label: 'My Clients', description: 'View and manage your coaching clients', to: '/dashboard/students' },
+      { icon: <Eye size={24} />, label: 'Profile Visits', description: 'See who has viewed your profile', to: '/dashboard/profile-visits' },
       { icon: <Sparkles size={24} />, label: 'AI Insights', description: 'Summarise files & extract insights', to: '/dashboard/ai-insights' },
     ];
   }

@@ -5,9 +5,10 @@ interface ProviderTileProps {
   profile: Profile;
   details: ProviderDetails;
   onBook: () => void;
+  onBookIntro?: () => void;
 }
 
-export default function ProviderTile({ profile, details, onBook }: ProviderTileProps) {
+export default function ProviderTile({ profile, details, onBook, onBookIntro }: ProviderTileProps) {
   const roleName = getRoleDisplayName(profile.role);
   const fullName = `${profile.first_name} ${profile.last_name}`;
   
@@ -226,6 +227,15 @@ export default function ProviderTile({ profile, details, onBook }: ProviderTileP
         >
           Book Now
         </button>
+        {onBookIntro && (
+          <button
+            onClick={onBookIntro}
+            className="btn btn-outline"
+            style={{ width: '100%', padding: '0.6rem 0', borderRadius: '8px', fontSize: '0.9rem', borderColor: 'var(--color-primary)', color: 'var(--color-primary-dark)' }}
+          >
+            ☕ Book Intro Call
+          </button>
+        )}
         <a 
           href={`/directory/${profile.id}`} 
           className="btn btn-outline"

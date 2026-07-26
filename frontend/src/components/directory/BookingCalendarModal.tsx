@@ -12,6 +12,7 @@ interface BookingCalendarModalProps {
   onClose: () => void;
   editingBooking?: BookingWithProvider;
   onUpdated?: () => void;
+  bookingType?: 'session' | 'intro_call';
 }
 
 const DURATIONS = [
@@ -32,14 +33,16 @@ function minutesToTime(mins: number): string {
   return `${h}:${m}`;
 }
 
-export default function BookingCalendarModal({ provider, onClose, editingBooking, onUpdated }: BookingCalendarModalProps) {
+export default function BookingCalendarModal({ provider, onClose, editingBooking, onUpdated, bookingType = 'session' }: BookingCalendarModalProps) {
   const { session, profile: currentUser } = useAuth();
   const isEditing = !!editingBooking;
 
   const initialDate = editingBooking ? new Date(editingBooking.session_date) : new Date();
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [selectedDate, setSelectedDate] = useState<Date | null>(editingBooking ? initialDate : null);
-  const [selectedDuration, setSelectedDuration] = useState<number>(editingBooking?.duration_minutes ?? 30);
+  const [selectedDuration, setSelectedDuration] = useState<number>(
+    bookingType === 'intro_call' ? 15 : (editingBooking?.duration_minutes ?? 30)
+  );
   const [selectedSlot, setSelectedSlot] = useState<string | null>(
     editingBooking ? initialDate.toTimeString().slice(0, 5) : null
   );
@@ -208,6 +211,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
       session_date: sessionDate.toISOString(),
       duration_minutes: selectedDuration,
       status: 'pending', // Tutor/Coach needs to confirm later
+      booking_type: bookingType,
       student_topic: topic || null,
       student_note: note.trim() || null,
       use_video_room: useVideoRoom,
@@ -230,6 +234,14 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
       if (topic) lines.push(`Topic: ${topic}`);
       if (note.trim()) lines.push(`Note: ${note.trim()}`);
       await sendMessage(conversation.id, lines.join('\n'));
+      
+      // Also insert a notification for the student so it shows in their recent activity
+      await supabase.from('user_notifications').insert({
+        user_id: currentUser.id,
+        title: bookingType === 'intro_call' ? 'Requested Intro Call' : 'Requested Session',
+        body: `You requested a ${bookingType === 'intro_call' ? 'free intro call' : 'session'} with ${provider.first_name} on ${sessionDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}.`,
+        link: '/dashboard/bookings'
+      });
     } catch {
       // Non-fatal - the booking itself already succeeded.
     }
@@ -310,31 +322,39 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
 
               {/* Left Col: Calendar & Duration */}
               <div>
-                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>1. Select Duration</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>
-                  {DURATIONS.map(dur => {
-                    const active = selectedDuration === dur.value;
-                    return (
-                      <button
-                        key={dur.value}
-                        onClick={() => setSelectedDuration(dur.value)}
-                        style={{
-                          padding: '0.65rem 0.5rem',
-                          borderRadius: '10px',
-                          border: `2px solid ${active ? 'var(--color-primary-dark)' : '#e2e8f0'}`,
-                          background: active ? 'var(--color-primary-dark)' : '#fff',
-                          color: active ? '#fff' : '#333',
-                          cursor: 'pointer',
-                          fontWeight: active ? 700 : 500,
-                          transition: 'all 0.15s',
-                          boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                        }}
-                      >
-                        {active ? '✓ ' : ''}{dur.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                {bookingType === 'intro_call' ? (
+                  <div style={{ marginBottom: '2rem', padding: '1rem', background: '#e3f2fd', borderRadius: '8px', color: '#1565C0', fontWeight: 500 }}>
+                    ☕ Intro calls are free 15-minute sessions to get to know your professional.
+                  </div>
+                ) : (
+                  <>
+                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>1. Select Duration</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>
+                      {DURATIONS.map(dur => {
+                        const active = selectedDuration === dur.value;
+                        return (
+                          <button
+                            key={dur.value}
+                            onClick={() => setSelectedDuration(dur.value)}
+                            style={{
+                              padding: '0.65rem 0.5rem',
+                              borderRadius: '10px',
+                              border: `2px solid ${active ? 'var(--color-primary-dark)' : '#e2e8f0'}`,
+                              background: active ? 'var(--color-primary-dark)' : '#fff',
+                              color: active ? '#fff' : '#333',
+                              cursor: 'pointer',
+                              fontWeight: active ? 700 : 500,
+                              transition: 'all 0.15s',
+                              boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                            }}
+                          >
+                            {active ? '✓ ' : ''}{dur.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '1rem', margin: 0 }}>2. Select Date</h3>

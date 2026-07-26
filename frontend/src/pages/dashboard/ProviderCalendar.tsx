@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
@@ -31,6 +31,80 @@ interface PopulatedBooking extends Booking {
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2).toString().padStart(2, '0');
+  const minute = (i % 2 === 0 ? '00' : '30');
+  return `${hour}:${minute}`;
+});
+
+function TimeCombobox({ value, onChange, style, placeholder }: { value: string, onChange: (v: string) => void, style?: React.CSSProperties, placeholder?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setIsOpen(true)}
+        onClick={() => setIsOpen(true)}
+        style={{ ...style, width: '100%', boxSizing: 'border-box' }}
+        placeholder={placeholder}
+        pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+        title="Please enter a valid time (HH:MM)"
+      />
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          maxHeight: '200px',
+          overflowY: 'auto',
+          background: 'white',
+          border: '1px solid #ddd',
+          borderRadius: '6px',
+          zIndex: 1000,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          marginTop: '4px'
+        }}>
+          {TIME_OPTIONS.map(time => (
+            <div
+              key={time}
+              onClick={() => {
+                onChange(time);
+                setIsOpen(false);
+              }}
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                background: time === value ? 'var(--color-spring-light)' : 'transparent',
+                color: 'var(--color-text-main)',
+                fontSize: '0.9rem'
+              }}
+              onMouseOver={(e) => (e.currentTarget.style.background = 'var(--color-spring-light)')}
+              onMouseOut={(e) => (e.currentTarget.style.background = time === value ? 'var(--color-spring-light)' : 'transparent')}
+            >
+              {time}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type RuleFrequencyOption = AvailabilityFrequency | 'one_time';
 
@@ -633,11 +707,21 @@ export default function ProviderCalendar() {
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{ flex: 1 }}>
                 <label style={availLabelStyle}>Start</label>
-                <input type="time" value={ruleStart} onChange={(e) => setRuleStart(e.target.value)} style={availInputStyle} />
+                <TimeCombobox 
+                  value={ruleStart} 
+                  onChange={setRuleStart} 
+                  style={availInputStyle} 
+                  placeholder="09:00"
+                />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={availLabelStyle}>End</label>
-                <input type="time" value={ruleEnd} onChange={(e) => setRuleEnd(e.target.value)} style={availInputStyle} />
+                <TimeCombobox 
+                  value={ruleEnd} 
+                  onChange={setRuleEnd} 
+                  style={availInputStyle} 
+                  placeholder="17:00"
+                />
               </div>
             </div>
 

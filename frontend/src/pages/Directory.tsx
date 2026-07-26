@@ -23,6 +23,7 @@ export default function Directory() {
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [specialtySearch, setSpecialtySearch] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<DirectoryProfile | null>(null);
+  const [bookingType, setBookingType] = useState<'session' | 'intro_call'>('session');
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   useEffect(() => {
@@ -38,8 +39,6 @@ export default function Directory() {
         .eq('status', 'approved');
 
       if (data) {
-        // Filter out profiles that might not have provider_details set up yet
-        // In a real app, we'd also handle pagination
         const validProviders = (data as any[]).filter(p => p.provider_details) as DirectoryProfile[];
         setProviders(validProviders);
       }
@@ -73,10 +72,11 @@ export default function Directory() {
     setSelectedSpecialties(prev => prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]);
   };
 
-  const handleBookClick = (provider: DirectoryProfile) => {
+  const handleBookClick = (provider: DirectoryProfile, type: 'session' | 'intro_call' = 'session') => {
     if (!session) {
       setShowAuthPrompt(true);
     } else {
+      setBookingType(type);
       setSelectedProvider(provider);
     }
   };
@@ -192,7 +192,8 @@ export default function Directory() {
                 key={provider.id} 
                 profile={provider} 
                 details={provider.provider_details} 
-                onBook={() => handleBookClick(provider)}
+                onBook={() => handleBookClick(provider, 'session')}
+                onBookIntro={() => handleBookClick(provider, 'intro_call')}
               />
             ))}
           </div>
@@ -202,6 +203,7 @@ export default function Directory() {
         {selectedProvider && (
           <BookingCalendarModal 
             provider={selectedProvider} 
+            bookingType={bookingType}
             onClose={() => setSelectedProvider(null)} 
           />
         )}
