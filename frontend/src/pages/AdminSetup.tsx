@@ -38,20 +38,10 @@ export default function AdminSetup() {
     }
 
     if (authData.user) {
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        role: 'admin',
-        status: 'approved',
-      });
-
-      if (profileError) {
-        setError(profileError.message);
-        setLoading(false);
-        return;
-      }
+      // The database trigger on_auth_user_created automatically inserts the profile
+      // with the role='admin' from the metadata we passed above. 
+      // We don't need to manually insert it here (doing so causes a 400 error 
+      // because the bootstrap trigger blocks duplicate admins).
 
       // Full reload (not React Router navigate) so AuthContext fetches the fresh admin
       // profile from scratch, rather than racing its own async signup/session state.
