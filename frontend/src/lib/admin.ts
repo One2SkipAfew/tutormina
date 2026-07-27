@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { AI_API_BASE } from './aiApi';
 import type { Profile, ProviderDetails, WorkExperience, ProfessionalReference, UserStatus, UserRole } from '../types/lms';
 
 const STATUS_EMAIL_COPY: Record<string, { subject: string; body: (reason?: string | null) => string }> = {
@@ -34,7 +35,7 @@ async function sendStatusEmail(profile: Profile, status: UserStatus, reason?: st
   if (!copy) return;
 
   try {
-    await fetch('/api/send-application-email', {
+    await fetch(`${AI_API_BASE}/send-application-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to: profile.email, subject: copy.subject, body: copy.body(reason) }),

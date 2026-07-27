@@ -16,7 +16,7 @@ const getAiApiBaseUrl = (): string => {
   return '';
 };
 
-const AI_API_BASE = getAiApiBaseUrl();
+export const AI_API_BASE = getAiApiBaseUrl();
 
 /** Derive WebSocket URL from the API base. */
 export const getWsUrl = (path: string = '/ws/livestream'): string => {
