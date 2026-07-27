@@ -15,6 +15,10 @@ import tempfile
 import base64
 import smtplib
 from email.mime.text import MIMEText
+try:
+    import resend
+except ImportError:
+    resend = None
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -65,6 +69,11 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 SMTP_HOST = os.getenv("SMTP_HOST", "127.0.0.1")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "54325"))
 EMAIL_FROM = os.getenv("EMAIL_FROM", "no-reply@tutormina.local")
+
+# Resend Mailer (Production)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+if RESEND_API_KEY and resend:
+    resend.api_key = RESEND_API_KEY
 
 # Origins
 ALLOWED_ORIGINS = [
@@ -1133,15 +1142,25 @@ async def livestream_websocket(websocket: WebSocket):
 @app.post("/send-application-email")
 async def send_application_email(input: ApplicationEmailInput):
     """Send a professional-application status email."""
-    message = MIMEText(input.body)
-    message["Subject"] = input.subject
-    message["From"] = EMAIL_FROM
-    message["To"] = input.to
-
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
-            server.send_message(message)
-    except OSError as exc:
+        if RESEND_API_KEY and resend:
+            # Use Resend API for production
+            resend.Emails.send({
+                "from": EMAIL_FROM,
+                "to": input.to,
+                "subject": input.subject,
+                "html": input.body,
+            })
+        else:
+            # Fallback to local SMTP (Inbucket for development)
+            message = MIMEText(input.body, "html")
+            message["Subject"] = input.subject
+            message["From"] = EMAIL_FROM
+            message["To"] = input.to
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+                server.send_message(message)
+    except Exception as exc:
+        logger.exception("Failed to send email")
         raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
 
     return {"status": "sent"}

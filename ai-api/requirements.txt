@@ -31,3 +31,6 @@ edge-tts>=7.2.0
 
 # WebSocket support
 websockets>=13.0
+
+# Email Sending
+resend>=2.1.0
