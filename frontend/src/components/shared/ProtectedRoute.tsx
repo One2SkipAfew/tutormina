@@ -55,6 +55,13 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
       if (!hasSeenWelcome) {
         return <Navigate to="/application-status" replace />;
       }
+    } else if (profile.role === 'admin') {
+      // Admins are never shown the tutor/coach application-status page.
+      // If they somehow land on a non-admin dashboard route, push them to their own dashboard.
+      const isAdminRoute = location.pathname.startsWith('/dashboard/admin');
+      if (!isAdminRoute && !STATUS_GATE_EXEMPT_PATHS.includes(location.pathname)) {
+        // Let them through — the allowedRoles guard below handles further access control.
+      }
     }
   }
 
