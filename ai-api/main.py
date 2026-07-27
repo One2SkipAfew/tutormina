@@ -68,7 +68,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 # SMTP (local dev only — production uses Supabase email or a real provider)
 SMTP_HOST = os.getenv("SMTP_HOST", "127.0.0.1")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "54325"))
-EMAIL_FROM = os.getenv("EMAIL_FROM", "no-reply@tutormina.local")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "no-reply@send.tutormina.com")
 
 # Resend Mailer (Production)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
