@@ -1,5 +1,5 @@
-﻿# ============================================
-# TutorMina â€” Local Dev Startup Script
+# ============================================
+# TutorMina  Local Dev Startup Script
 # ============================================
 # Run from the project root: .\dev-start.ps1
 # This starts all 3 services for local development.
@@ -7,7 +7,7 @@
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  TutorMina â€” Starting Local Dev Stack" -ForegroundColor Cyan
+Write-Host "  TutorMina  Starting Local Dev Stack" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 

@@ -1014,7 +1014,7 @@ async def livestream_websocket(websocket: WebSocket):
     is_closing = False
 
     try:
-        dg_connection = deepgram_client.listen.websocket.v("1")
+        dg_connection = deepgram_client.listen.asyncwebsocket.v("1")
 
         async def on_message(self, result, **kwargs):
             try:
@@ -1079,7 +1079,7 @@ async def livestream_websocket(websocket: WebSocket):
             channels=1,
         )
 
-        started = dg_connection.start(options)
+        started = await dg_connection.start(options)
         if not started:
             await websocket.send_json({"type": "error", "message": "Failed to start transcription."})
             await websocket.close()
@@ -1091,7 +1091,7 @@ async def livestream_websocket(websocket: WebSocket):
             try:
                 data = await websocket.receive()
                 if "bytes" in data:
-                    dg_connection.send(data["bytes"])
+                    await dg_connection.send(data["bytes"])
                 elif "text" in data:
                     try:
                         control = json.loads(data["text"])
@@ -1118,7 +1118,7 @@ async def livestream_websocket(websocket: WebSocket):
         is_closing = True
         if dg_connection:
             try:
-                dg_connection.finish()
+                await dg_connection.finish()
             except Exception:
                 pass
         try:
