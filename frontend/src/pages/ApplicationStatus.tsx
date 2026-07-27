@@ -26,6 +26,8 @@ export default function ApplicationStatus() {
   const copy = STATUS_COPY[profile.status] ?? { title: 'Account status', tone: 'var(--color-text-main)' };
   const canReapply = profile.status === 'declined' && (profile.role === 'tutor' || profile.role === 'coach');
   const isApproved = profile.status === 'approved' && (profile.role === 'tutor' || profile.role === 'coach');
+  const isAdminApproved = profile.status === 'approved' && profile.role === 'admin';
+
 
   return (
     <div className="container animate-fade-in" style={{ paddingTop: '4rem', maxWidth: '560px' }}>
@@ -70,12 +72,19 @@ export default function ApplicationStatus() {
               </button>
             </>
           )}
+          {isAdminApproved && (
+            <>
+              <button className="btn btn-primary" onClick={() => navigate('/dashboard/admin/applications')}>
+                Go to Admin Dashboard
+              </button>
+            </>
+          )}
           {canReapply && (
             <button className="btn btn-primary" onClick={() => navigate('/vetting-application')}>
               Update &amp; resubmit application
             </button>
           )}
-          {!isApproved && (
+          {!isApproved && !isAdminApproved && (
             <button className="btn btn-outline" onClick={signOut}>Log Out</button>
           )}
         </div>
