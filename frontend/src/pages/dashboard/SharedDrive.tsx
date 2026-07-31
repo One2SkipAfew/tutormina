@@ -70,7 +70,7 @@ export default function SharedDrive() {
         } as any)));
       } else {
         const [folderData, fileData] = await Promise.all([
-          getFolders(currentFolderId),
+          getFolders(currentFolderId, undefined, activeFilter || undefined),
           getFiles({
             folderId: currentFolderId,
             fileType: activeFilter || undefined,

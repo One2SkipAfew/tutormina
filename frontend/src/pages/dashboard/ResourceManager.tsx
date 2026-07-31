@@ -1,10 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createFolder, getFolders, deleteFolder, updateFolder } from '../../lib/sharedDrive';
 import { getFiles, uploadFile, deleteFile as deleteSharedFile } from '../../lib/sharedDrive';
-import { getZoneColor, getFileTypeIcon, formatFileSize } from '../../types/lms';
+import { getZoneColor, getFileTypeIcon, formatFileSize, getAllowedExtensionsForType } from '../../types/lms';
 import type { Folder, SharedFile, FileType, FileVisibility } from '../../types/lms';
+import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic } from 'lucide-react';
 import '../../styles/shared-drive.css';
+
+const FILE_TYPE_FILTERS: { value: FileType | ''; label: string; icon: React.ReactNode }[] = [
+  { value: '', label: 'All', icon: <ClipboardList size={16} /> },
+  { value: 'document', label: 'Documents', icon: <FileText size={16} /> },
+  { value: 'video', label: 'Videos', icon: <Film size={16} /> },
+  { value: 'past_paper', label: 'Past Papers', icon: <Edit3 size={16} /> },
+  { value: 'notes', label: 'Notes', icon: <Book size={16} /> },
+  { value: 'course_material', label: 'Course Material', icon: <BookOpen size={16} /> },
+  { value: 'recording', label: 'Recordings', icon: <Mic size={16} /> },
+];
 
 export default function ResourceManager() {
   const { profile } = useAuth();
@@ -20,6 +31,7 @@ export default function ResourceManager() {
   ]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeFilter, setActiveFilter] = useState<FileType | ''>('');
 
   // Modals
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -47,8 +59,8 @@ export default function ResourceManager() {
     setLoading(true);
     try {
       const [folderData, fileData] = await Promise.all([
-        getFolders(currentFolderId, profile.id),
-        getFiles({ folderId: currentFolderId, uploadedBy: profile.id }),
+        getFolders(currentFolderId, profile.id, activeFilter || undefined),
+        getFiles({ folderId: currentFolderId, uploadedBy: profile.id, fileType: activeFilter || undefined }),
       ]);
       setFolders(folderData);
       setFiles(fileData);
@@ -57,7 +69,7 @@ export default function ResourceManager() {
     } finally {
       setLoading(false);
     }
-  }, [currentFolderId, profile]);
+  }, [currentFolderId, profile, activeFilter]);
 
   useEffect(() => {
     loadData();
@@ -80,7 +92,7 @@ export default function ResourceManager() {
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
     try {
-      await createFolder(newFolderName.trim(), currentFolderId, newFolderDesc || null);
+      await createFolder(newFolderName.trim(), currentFolderId, newFolderDesc || null, null, activeFilter || null);
       setShowNewFolder(false);
       setNewFolderName('');
       setNewFolderDesc('');
@@ -177,6 +189,21 @@ export default function ResourceManager() {
         </p>
       </div>
 
+      {/* Filters */}
+      <div className="drive-filters">
+        {FILE_TYPE_FILTERS.map(f => (
+          <button
+            key={f.value}
+            className={`drive-filter-chip ${activeFilter === f.value ? 'active' : ''}`}
+            onClick={() => {
+              setActiveFilter(f.value as FileType | '');
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>{f.icon} {f.label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Controls */}
       <div className="drive-controls">
         <div className="drive-controls-left">
@@ -206,7 +233,10 @@ export default function ResourceManager() {
           <button
             className="btn btn-primary"
             style={{ padding: '0.5rem 0.85rem', fontSize: '0.82rem', background: zoneColor }}
-            onClick={() => setShowUpload(true)}
+            onClick={() => {
+              setUploadType(activeFilter || 'document');
+              setShowUpload(true);
+            }}
           >
             ⬆️ Upload File
           </button>
@@ -243,7 +273,10 @@ export default function ResourceManager() {
               <button className="btn btn-outline" onClick={() => setShowNewFolder(true)}>
                 📁 New Folder
               </button>
-              <button className="btn btn-primary" onClick={() => setShowUpload(true)} style={{ background: zoneColor }}>
+              <button className="btn btn-primary" onClick={() => {
+                setUploadType(activeFilter || 'document');
+                setShowUpload(true);
+              }} style={{ background: zoneColor }}>
                 ⬆️ Upload
               </button>
             </div>
@@ -424,6 +457,7 @@ export default function ResourceManager() {
               <label className={`upload-dropzone ${uploadFile_ ? '' : ''}`}>
                 <input
                   type="file"
+                  accept={getAllowedExtensionsForType(uploadType).join(',')}
                   style={{ display: 'none' }}
                   onChange={handleFileSelect}
                 />
@@ -435,7 +469,9 @@ export default function ResourceManager() {
                   }
                 </div>
                 <div className="upload-dropzone-hint">
-                  Max 100 MB (500 MB for video) • PDF, DOC, PPT, MP4, MP3, and more
+                  {uploadType === 'video' ? 'Max 500 MB • Video files only' : 
+                   uploadType === 'recording' ? 'Max 100 MB • Audio files only' : 
+                   `Max 100 MB • ${getAllowedExtensionsForType(uploadType).slice(0, 5).join(', ').toUpperCase()}...`}
                 </div>
               </label>
 

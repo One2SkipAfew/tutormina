@@ -2,7 +2,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public
-as $function
+as $function$
 declare
   raw_role text;
   v_role user_role;
@@ -59,4 +59,4 @@ begin
 
   return new;
 end;
-$function;
+$function$;

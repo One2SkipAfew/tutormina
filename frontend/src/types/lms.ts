@@ -119,6 +119,7 @@ export interface Folder {
   name: string;
   description: string | null;
   color: string | null;
+  folder_type: FileType | null;
   created_at: string;
   updated_at: string;
   // Virtual fields (computed in queries)
@@ -405,8 +406,31 @@ export const FILE_LIMITS = {
   MAX_FILE_SIZE_MB: 100,           // 100 MB max per file
   MAX_VIDEO_SIZE_MB: 500,          // 500 MB max for video
   MAX_VIDEO_DURATION_SECONDS: 7200, // 2 hours max
-  ALLOWED_DOCUMENT_TYPES: ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.csv'],
+  ALLOWED_DOCUMENT_TYPES: ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.csv', '.md', '.rtf', '.epub'],
   ALLOWED_VIDEO_TYPES: ['.mp4', '.mov', '.avi', '.webm', '.mkv'],
   ALLOWED_IMAGE_TYPES: ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'],
   ALLOWED_AUDIO_TYPES: ['.mp3', '.wav', '.m4a', '.ogg', '.flac'],
+  ALLOWED_NOTES_TYPES: ['.txt', '.pdf', '.md', '.rtf', '.doc', '.docx', '.one', '.xps', '.wbz', '.wbd'],
+  ALLOWED_PAST_PAPER_TYPES: ['.pdf', '.doc', '.docx', '.zip'],
+  ALLOWED_COURSE_MATERIAL_TYPES: ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.zip', '.txt', '.md'],
 } as const;
+
+export function getAllowedExtensionsForType(type: FileType | string): readonly string[] {
+  switch (type) {
+    case 'document': return FILE_LIMITS.ALLOWED_DOCUMENT_TYPES;
+    case 'video': return FILE_LIMITS.ALLOWED_VIDEO_TYPES;
+    case 'past_paper': return FILE_LIMITS.ALLOWED_PAST_PAPER_TYPES;
+    case 'notes': return FILE_LIMITS.ALLOWED_NOTES_TYPES;
+    case 'course_material': return FILE_LIMITS.ALLOWED_COURSE_MATERIAL_TYPES;
+    case 'recording': return FILE_LIMITS.ALLOWED_AUDIO_TYPES;
+    default: return [
+      ...FILE_LIMITS.ALLOWED_DOCUMENT_TYPES,
+      ...FILE_LIMITS.ALLOWED_VIDEO_TYPES,
+      ...FILE_LIMITS.ALLOWED_IMAGE_TYPES,
+      ...FILE_LIMITS.ALLOWED_AUDIO_TYPES,
+      ...FILE_LIMITS.ALLOWED_NOTES_TYPES,
+      '.zip'
+    ];
+  }
+}
+

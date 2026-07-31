@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import type { SharedFile, Folder, FileType, FileVisibility, ResourceAlert } from '../types/lms';
-import { FILE_LIMITS } from '../types/lms';
+import { FILE_LIMITS, getAllowedExtensionsForType } from '../types/lms';
 
 const STORAGE_BUCKET = 'shared-drive';
 
@@ -10,7 +10,8 @@ export async function createFolder(
   name: string,
   parentFolderId: string | null = null,
   description: string | null = null,
-  color: string | null = null
+  color: string | null = null,
+  folderType: FileType | null = null
 ): Promise<Folder> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -23,6 +24,7 @@ export async function createFolder(
       name,
       description,
       color,
+      folder_type: folderType,
     })
     .select()
     .single();
@@ -31,7 +33,7 @@ export async function createFolder(
   return data;
 }
 
-export async function getFolders(parentFolderId: string | null = null, ownerId?: string): Promise<Folder[]> {
+export async function getFolders(parentFolderId: string | null = null, ownerId?: string, folderType?: FileType | ''): Promise<Folder[]> {
   let query = supabase
     .from('folders')
     .select('*')
@@ -45,6 +47,10 @@ export async function getFolders(parentFolderId: string | null = null, ownerId?:
 
   if (ownerId) {
     query = query.eq('owner_id', ownerId);
+  }
+
+  if (folderType) {
+    query = query.eq('folder_type', folderType);
   }
 
   const { data, error } = await query;
@@ -75,9 +81,9 @@ export async function deleteFolder(folderId: string): Promise<void> {
 
 // ============ FILES ============
 
-export function validateFile(file: File): string | null {
+export function validateFile(file: File, fileType: FileType): string | null {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-  const isVideo = (FILE_LIMITS.ALLOWED_VIDEO_TYPES as readonly string[]).includes(ext);
+  const isVideo = fileType === 'video';
   const maxSize = isVideo ? FILE_LIMITS.MAX_VIDEO_SIZE_MB : FILE_LIMITS.MAX_FILE_SIZE_MB;
   const fileSizeMB = file.size / (1024 * 1024);
 
@@ -85,15 +91,10 @@ export function validateFile(file: File): string | null {
     return `File is too large (${fileSizeMB.toFixed(1)} MB). Maximum is ${maxSize} MB${isVideo ? ' for videos' : ''}.`;
   }
 
-  const allAllowed = [
-    ...FILE_LIMITS.ALLOWED_DOCUMENT_TYPES,
-    ...FILE_LIMITS.ALLOWED_VIDEO_TYPES,
-    ...FILE_LIMITS.ALLOWED_IMAGE_TYPES,
-    ...FILE_LIMITS.ALLOWED_AUDIO_TYPES,
-  ];
+  const allAllowed = getAllowedExtensionsForType(fileType);
 
   if (!(allAllowed as readonly string[]).includes(ext)) {
-    return `File type "${ext}" is not supported. Allowed: ${allAllowed.join(', ')}`;
+    return `File type "${ext}" is not supported for ${fileType.replace('_', ' ')}. Allowed: ${allAllowed.join(', ')}`;
   }
 
   return null;
@@ -115,7 +116,7 @@ export async function uploadFile(
   if (!user) throw new Error('Not authenticated');
 
   // Validate
-  const validationError = validateFile(file);
+  const validationError = validateFile(file, metadata.file_type);
   if (validationError) throw new Error(validationError);
 
   // Upload to storage
