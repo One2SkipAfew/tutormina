@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createFolder, getFolders, deleteFolder, updateFolder } from '../../lib/sharedDrive';
 import { getFiles, uploadFile, deleteFile as deleteSharedFile } from '../../lib/sharedDrive';
