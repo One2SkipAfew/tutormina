@@ -26,6 +26,16 @@ interface QuickAction {
   to: string;
 }
 
+export interface ActivityItem {
+  id: string;
+  type: 'booking' | 'resource' | 'client' | 'message' | 'notification';
+  title: string;
+  description: string;
+  timestamp: string;
+  link: string;
+  isUnread?: boolean;
+}
+
 function getStatsForRole(role: UserRole): StatItem[] {
   if (role === 'tutor') {
     return [
@@ -96,6 +106,103 @@ async function getCustomerStats(): Promise<StatItem[]> {
     { icon: <Target size={24} />, value: String(streak), label: 'Learning Streak', to: '/dashboard/learning-zone' },
     { icon: <Trophy size={24} />, value: String(completed), label: 'Completed Sessions', to: '/dashboard/learning-zone' },
   ];
+}
+
+async function getAggregatedActivity(userId: string, role: UserRole): Promise<ActivityItem[]> {
+  const [
+    { data: bookings },
+    { data: resources },
+    { data: conversations },
+    { data: notifications }
+  ] = await Promise.all([
+    // 1. Bookings
+    supabase
+      .from('bookings')
+      .select('id, created_at, customer:profiles!bookings_customer_id_fkey(first_name, last_name), provider:profiles!bookings_provider_id_fkey(first_name, last_name)')
+      .or(`customer_id.eq.${userId},provider_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    // 2. Resources
+    (role === 'tutor' || role === 'coach')
+      ? supabase.from('shared_files').select('id, created_at, title').eq('uploaded_by', userId).order('created_at', { ascending: false }).limit(10)
+      : supabase.from('shared_files').select('id, created_at, title').in('visibility', ['public', 'students_only']).order('created_at', { ascending: false }).limit(10),
+    // 3. Conversations
+    supabase
+      .from('conversations')
+      .select('id, last_message_at, participant_one:profiles!conversations_participant_one_id_fkey(first_name, last_name), participant_two:profiles!conversations_participant_two_id_fkey(first_name, last_name)')
+      .or(`participant_one_id.eq.${userId},participant_two_id.eq.${userId}`)
+      .not('last_message_at', 'is', null)
+      .order('last_message_at', { ascending: false })
+      .limit(10),
+    // 4. Notifications
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+  ]);
+
+  const items: ActivityItem[] = [];
+
+  bookings?.forEach(b => {
+    const isProvider = role === 'tutor' || role === 'coach';
+    const otherParty = isProvider ? b.customer : b.provider;
+    const name = Array.isArray(otherParty) ? otherParty[0] : otherParty;
+    const fullName = name ? `${(name as any).first_name} ${(name as any).last_name}` : 'Unknown';
+    
+    items.push({
+      id: `booking-${b.id}`,
+      type: isProvider ? 'client' : 'booking',
+      title: isProvider ? `New session booked by ${fullName}` : `You booked a session with ${fullName}`,
+      description: 'Check your calendar for details.',
+      timestamp: b.created_at,
+      link: isProvider ? '/dashboard/calendar' : '/dashboard/bookings',
+    });
+  });
+
+  resources?.forEach(r => {
+    items.push({
+      id: `resource-${r.id}`,
+      type: 'resource',
+      title: `Resource: ${r.title}`,
+      description: role === 'customer' ? 'A new resource is available.' : 'You uploaded a new resource.',
+      timestamp: r.created_at,
+      link: '/dashboard/shared-drive',
+    });
+  });
+
+  conversations?.forEach(c => {
+    const p1 = Array.isArray(c.participant_one) ? c.participant_one[0] : c.participant_one;
+    const p2 = Array.isArray(c.participant_two) ? c.participant_two[0] : c.participant_two;
+    // Guessing who the other is:
+    items.push({
+      id: `msg-${c.id}`,
+      type: 'message',
+      title: `New messages`,
+      description: 'You have recent activity in your inbox.',
+      timestamp: c.last_message_at,
+      link: '/dashboard/messages',
+    });
+  });
+
+  notifications?.forEach(n => {
+    items.push({
+      id: `notif-${n.id}`,
+      type: 'notification',
+      title: n.title || 'Notification',
+      description: n.body || '',
+      timestamp: n.created_at,
+      link: n.link || '#',
+      isUnread: !n.is_read,
+    });
+  });
+
+  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  
+  // Deduplicate by ID just in case
+  const uniqueItems = Array.from(new Map(items.map(item => [item.id, item])).values());
+  return uniqueItems.slice(0, 10);
 }
 
 function getQuickActionsForRole(role: UserRole): QuickAction[] {
@@ -171,6 +278,14 @@ const ACTIVITY_COPY: Record<string, { icon: string; label: (name: string, role: 
   deleted: { icon: '🗑️', label: (name) => `Deactivated ${name}'s account` },
 };
 
+const ACTIVITY_ICONS: Record<string, string> = {
+  booking: '📅',
+  resource: '📁',
+  client: '👤',
+  message: '💬',
+  notification: '🔔',
+};
+
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -192,7 +307,7 @@ export default function DashboardHome() {
   const [adminStats, setAdminStats] = useState<StatItem[] | null>(null);
   const [recentActivity, setRecentActivity] = useState<AdminActivityItem[] | null>(null);
   const [liveStats, setLiveStats] = useState<StatItem[] | null>(null);
-  const [recentNotifications, setRecentNotifications] = useState<Notification[] | null>(null);
+  const [aggregatedActivity, setAggregatedActivity] = useState<ActivityItem[] | null>(null);
 
   useEffect(() => {
     if (role !== 'admin') return;
@@ -224,7 +339,10 @@ export default function DashboardHome() {
       : getCustomerStats();
 
     statsPromise.then((s) => { if (!cancelled) setLiveStats(s); }).catch(() => {});
-    getNotifications().then((n) => { if (!cancelled) setRecentNotifications(n.slice(0, 8)); }).catch(() => {});
+    
+    getAggregatedActivity(profile.id, role).then(items => {
+      if (!cancelled) setAggregatedActivity(items);
+    }).catch(err => console.error('Failed to get aggregated activity', err));
 
     return () => { cancelled = true; };
   }, [role, profile]);
@@ -353,29 +471,29 @@ export default function DashboardHome() {
                 })}
               </div>
             )
-          ) : !recentNotifications || recentNotifications.length === 0 ? (
+          ) : !aggregatedActivity || aggregatedActivity.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
               <div className="empty-state-title">No recent activity</div>
               <div className="empty-state-text">
-                Your latest uploads, sessions, and resource interactions will appear here.
+                Your latest bookings, uploads, and messages will appear here.
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {recentNotifications.map((n) => (
+              {aggregatedActivity.map((item) => (
                 <a
-                  key={n.id}
-                  href={n.link ?? '#'}
+                  key={item.id}
+                  href={item.link}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.25rem', borderBottom: '1px solid rgba(0,0,0,0.06)', textDecoration: 'none', color: 'inherit' }}
                 >
-                  <span style={{ fontSize: '1.25rem' }}>{n.is_read ? '•' : '🔔'}</span>
+                  <span style={{ fontSize: '1.25rem' }}>{ACTIVITY_ICONS[item.type] ?? '🔔'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.88rem', fontWeight: n.is_read ? 400 : 600 }}>{n.title}</div>
-                    {n.body && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{n.body}</div>}
+                    <div style={{ fontSize: '0.88rem', fontWeight: item.isUnread ? 600 : 500 }}>{item.title}</div>
+                    {item.description && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{item.description}</div>}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                    {formatRelativeTime(n.created_at)}
+                    {formatRelativeTime(item.timestamp)}
                   </div>
                 </a>
               ))}
