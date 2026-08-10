@@ -5,8 +5,8 @@ python-multipart==0.0.9
 python-dotenv==1.0.1
 pydantic>=2.0
 
-# AI — Gemini
-google-genai>=1.0.0
+# AI — Groq (free-tier, open-source models: Llama 3.3, Whisper, Qwen vision)
+groq>=0.11.0
 
 # Transcription — Deepgram (optional, for real-time WebSocket STT)
 deepgram-sdk==3.3.0

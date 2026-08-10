@@ -13,8 +13,9 @@ import {
   addReference,
   deleteReference,
   submitApplication,
+  uploadProviderQualifications,
 } from '../lib/vetting';
-import { useModal } from '../contexts/NotificationContext';
+import { useModal, useToast } from '../contexts/NotificationContext';
 import '../styles/vetting.css';
 
 export default function VettingApplication() {
@@ -30,6 +31,8 @@ export default function VettingApplication() {
 
   const [bio, setBio] = useState('');
   const [qualifications, setQualifications] = useState('');
+  const [qualificationsFileUrl, setQualificationsFileUrl] = useState<string | null>(null);
+  const [uploadingQualifications, setUploadingQualifications] = useState(false);
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [specialtyDraft, setSpecialtyDraft] = useState('');
   const [yearsOfExperience, setYearsOfExperience] = useState('');
@@ -67,6 +70,7 @@ export default function VettingApplication() {
         setAvatarUrl(details.avatar_url);
         setBio(details.bio ?? '');
         setQualifications(details.qualifications ?? '');
+        setQualificationsFileUrl(details.qualifications_file_url ?? null);
         setSpecialties(details.specialties ?? []);
         setYearsOfExperience(details.years_of_experience?.toString() ?? '');
         setLocation(details.location ?? '');
@@ -103,9 +107,16 @@ export default function VettingApplication() {
     }
   };
 
+  const { showToast } = useToast();
+
   const handleAddSpecialty = () => {
     const trimmed = specialtyDraft.trim();
-    if (trimmed && !specialties.includes(trimmed)) {
+    if (!trimmed) return;
+    if (trimmed.length > 25 || trimmed.split(/\s+/).length > 2) {
+      showToast('error', 'Specialties must be 1-2 words and under 25 characters. Please use the Bio for longer descriptions.');
+      return;
+    }
+    if (!specialties.includes(trimmed)) {
       setSpecialties([...specialties, trimmed]);
     }
     setSpecialtyDraft('');
@@ -121,6 +132,7 @@ export default function VettingApplication() {
       await saveProviderDetails({
         bio,
         qualifications,
+        qualifications_file_url: qualificationsFileUrl,
         specialties: finalSpecialties,
         years_of_experience: yearsOfExperience ? Number(yearsOfExperience) : null,
         location,
@@ -176,6 +188,10 @@ export default function VettingApplication() {
   };
 
   const handleSubmit = async () => {
+    if (!qualificationsFileUrl) {
+      showModal({ type: 'error', title: 'Missing Qualifications', message: 'Please upload a copy of your qualifications before submitting.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+      return;
+    }
     setSaving(true);
     try {
       await handleSaveDetails();
@@ -222,10 +238,10 @@ export default function VettingApplication() {
 
       <div className="glass-card vetting-section">
         <h3>Description of services &amp; specialities</h3>
-        <label>About you / your services</label>
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} placeholder="Describe your teaching/coaching style and what you offer..." />
+        <label>Bio &amp; Detailed Description</label>
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} placeholder="Describe your teaching/coaching style and what you offer in detail..." />
 
-        <label>Qualifications</label>
+        <label>Qualifications Overview</label>
         <input
           type="text"
           value={qualifications}
@@ -233,7 +249,39 @@ export default function VettingApplication() {
           placeholder="e.g. BSc Mathematics, PGCE, ICF Certified Coach"
         />
 
-        <label>Specialities</label>
+        <label>Qualifications Document (Required)</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+          {qualificationsFileUrl && (
+            <a href={qualificationsFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>
+              View Uploaded File
+            </a>
+          )}
+          <label className="btn btn-outline btn-sm">
+            {uploadingQualifications ? 'Uploading...' : qualificationsFileUrl ? 'Replace file' : 'Upload document'}
+            <input 
+              type="file" 
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" 
+              hidden 
+              disabled={uploadingQualifications}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploadingQualifications(true);
+                try {
+                  const url = await uploadProviderQualifications(file);
+                  setQualificationsFileUrl(url);
+                  showToast('success', 'Qualifications uploaded successfully');
+                } catch (err) {
+                  showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload qualifications', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+                } finally {
+                  setUploadingQualifications(false);
+                }
+              }}
+            />
+          </label>
+        </div>
+
+        <label>Specialities (Max 2 words per tag)</label>
         <div className="vetting-tag-input">
           <input
             type="text"

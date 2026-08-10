@@ -1,6 +1,6 @@
 """
 TutorMina AI API — HuggingFace Spaces Deployment
-Real AI-powered endpoints using Gemini 2.0 Flash.
+Real AI-powered endpoints using Groq (open-source models).
 
 Deployment: HuggingFace Space (Docker SDK, CPU Basic Free)
 Production URL: https://<username>-tutormina-ai.hf.space
@@ -58,8 +58,14 @@ else:
     load_dotenv()
 
 # Core credentials
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
+
+# Groq model IDs — kept as env-overridable constants since Groq rotates/deprecates
+# preview models fairly often; check console.groq.com/docs/models if one stops working.
+GROQ_TEXT_MODEL = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
+GROQ_STT_MODEL = os.getenv("GROQ_STT_MODEL", "whisper-large-v3")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
@@ -90,14 +96,14 @@ MAX_LIVESTREAM_SECONDS = int(os.getenv("MAX_LIVESTREAM_SECONDS", "5400"))
 # ---------------------------------------------------------------------------
 # Client Initialisation
 # ---------------------------------------------------------------------------
-gemini_client = None
-if GEMINI_API_KEY:
+groq_client = None
+if GROQ_API_KEY:
     try:
-        from google import genai
-        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logger.info("Gemini client initialised (model: gemini-2.0-flash).")
+        from groq import Groq
+        groq_client = Groq(api_key=GROQ_API_KEY)
+        logger.info("Groq client initialised (text: %s, vision: %s, stt: %s).", GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_STT_MODEL)
     except Exception as exc:
-        logger.error("Failed to initialise Gemini client: %s", exc)
+        logger.error("Failed to initialise Groq client: %s", exc)
 
 deepgram_client = None
 if DEEPGRAM_API_KEY:
@@ -122,7 +128,7 @@ if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
 # ---------------------------------------------------------------------------
 app = FastAPI(
     title="TutorMina AI API",
-    description="AI services for the TutorMina LMS platform — powered by Gemini 2.0 Flash.",
+    description="AI services for the TutorMina LMS platform — powered by Groq (open-source models).",
     version="1.0.0",
 )
 
@@ -155,30 +161,44 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 # ---------------------------------------------------------------------------
 # AI Helpers
 # ---------------------------------------------------------------------------
-GEMINI_MODEL = "gemini-2.0-flash"
 
-
-async def _call_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
-    """Call Gemini 2.0 Flash for text generation."""
-    if not gemini_client:
+async def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
+    """Call Groq's chat completions API (Llama 3.3 70B) for text generation."""
+    if not groq_client:
         raise HTTPException(
             status_code=503,
-            detail="AI service not configured. Set GEMINI_API_KEY in environment.",
+            detail="AI service not configured. Set GROQ_API_KEY in environment.",
         )
 
-    from google.genai import types
+    response = await asyncio.to_thread(
+        groq_client.chat.completions.create,
+        model=GROQ_TEXT_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=max_tokens,
+        temperature=0.3,
+    )
+    return response.choices[0].message.content
+
+
+async def _transcribe_with_groq(file_bytes: bytes, filename: str) -> str:
+    """Transcribe audio via Groq's Whisper Large v3 endpoint.
+
+    Note: Whisper doesn't do speaker diarization the way the old Gemini prompt asked
+    for, so the transcript comes back as plain text without "Speaker N:" labels.
+    """
+    if not groq_client:
+        raise RuntimeError("Groq client not configured")
 
     response = await asyncio.to_thread(
-        gemini_client.models.generate_content,
-        model=GEMINI_MODEL,
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=max_tokens,
-            temperature=0.3,
-        ),
+        groq_client.audio.transcriptions.create,
+        file=(filename or "audio.webm", file_bytes),
+        model=GROQ_STT_MODEL,
+        response_format="text",
     )
-    return response.text
+    return response if isinstance(response, str) else response.text
 
 
 CHUNK_WORD_LIMIT = int(os.getenv("CHUNK_WORD_LIMIT", "5000"))
@@ -207,12 +227,12 @@ def _split_text_into_chunks(text: str, max_words: int = CHUNK_WORD_LIMIT) -> lis
     return chunks if chunks else [text]
 
 
-async def _call_gemini_chunked(system_prompt: str, text: str, synthesis_prompt: str = "") -> str:
-    """Process potentially long text through Gemini in chunks, then synthesize."""
+async def _call_groq_chunked(system_prompt: str, text: str, synthesis_prompt: str = "") -> str:
+    """Process potentially long text through Groq in chunks, then synthesize."""
     word_count = len(text.split())
 
     if word_count <= CHUNK_WORD_LIMIT:
-        return await _call_gemini(system_prompt, text)
+        return await _call_groq(system_prompt, text)
 
     chunks = _split_text_into_chunks(text)
     logger.info("Chunking text: %d words -> %d chunks", word_count, len(chunks))
@@ -220,7 +240,7 @@ async def _call_gemini_chunked(system_prompt: str, text: str, synthesis_prompt: 
     chunk_results = []
     for i, chunk in enumerate(chunks):
         chunk_header = f"[Chunk {i + 1} of {len(chunks)}]\n\n"
-        result = await _call_gemini(system_prompt, chunk_header + chunk)
+        result = await _call_groq(system_prompt, chunk_header + chunk)
         chunk_results.append(f"--- Chunk {i + 1}/{len(chunks)} ---\n{result}")
 
     combined = "\n\n".join(chunk_results)
@@ -230,7 +250,7 @@ async def _call_gemini_chunked(system_prompt: str, text: str, synthesis_prompt: 
         "cohesive, deduplicated document. Remove redundant headers. Preserve all unique information. "
         "Output clean, well-structured markdown."
     )
-    return await _call_gemini(merge_system, combined)
+    return await _call_groq(merge_system, combined)
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +304,21 @@ class ApplicationEmailInput(BaseModel):
     body: str
 
 
+class BookingEmailInput(BaseModel):
+    to: str
+    student_name: str
+    provider_name: str
+    provider_image: Optional[str] = None
+    date: str          # e.g. "Monday, 11 August 2026"
+    time: str          # e.g. "14:00 – 15:00"
+    duration: str      # e.g. "60 minutes"
+    cost: Optional[str] = None  # e.g. "R250/hr" or None for free intro calls
+    notes: Optional[str] = None
+    topic: Optional[str] = None
+    booking_type: Optional[str] = "session"
+    login_url: str     # e.g. "https://tutormina.netlify.app/dashboard/bookings"
+
+
 class SessionSummaryRequest(BaseModel):
     transcript: str
     ai_notes: Optional[str] = None
@@ -307,7 +342,7 @@ def read_root():
         "status": "ok",
         "service": "TutorMina AI API",
         "version": "1.0.0",
-        "ai_provider": "Gemini 2.0 Flash" if gemini_client else "not configured",
+        "ai_provider": f"Groq ({GROQ_TEXT_MODEL})" if groq_client else "not configured",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -321,7 +356,7 @@ def health_check():
 
 @app.post("/summarise-text", response_model=SummaryResponse)
 async def summarise_text(input: TextInput):
-    """Summarise the given text using Gemini 2.0 Flash."""
+    """Summarise the given text using Groq."""
     system_prompt = (
         "You are an expert educational assistant. Summarise the provided text concisely. "
         "Return your response as a JSON object with two keys:\n"
@@ -331,7 +366,7 @@ async def summarise_text(input: TextInput):
     )
 
     try:
-        result = await _call_gemini_chunked(system_prompt, input.text)
+        result = await _call_groq_chunked(system_prompt, input.text)
         result = result.strip()
         if result.startswith("```"):
             result = result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -377,7 +412,7 @@ async def summarise_file(file: UploadFile = File(...)):
     )
 
     try:
-        result = await _call_gemini_chunked(system_prompt, f"Document: {filename}\n\n{text}")
+        result = await _call_groq_chunked(system_prompt, f"Document: {filename}\n\n{text}")
         result = result.strip()
         if result.startswith("```"):
             result = result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -408,7 +443,7 @@ async def extract_key_topics(input: TextInput):
     )
 
     try:
-        result = await _call_gemini(system_prompt, input.text)
+        result = await _call_groq(system_prompt, input.text)
         result = result.strip()
         if result.startswith("```"):
             result = result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -436,7 +471,7 @@ async def generate_insights(input: TextInput):
     )
 
     try:
-        result = await _call_gemini_chunked(system_prompt, input.text)
+        result = await _call_groq_chunked(system_prompt, input.text)
         result = result.strip()
         if result.startswith("```"):
             result = result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -504,38 +539,43 @@ async def parse_pdf(file: UploadFile = File(...)):
     }
 
 
-# ---- Image Scanning / OCR via Gemini Vision ----
+# ---- Image Scanning / OCR via Groq Vision ----
 
 @app.post("/extract-image")
 async def extract_image_text(file: UploadFile = File(...)):
-    """Scan an image and extract text using Gemini's vision capabilities."""
-    if not gemini_client:
+    """Scan an image and extract text using Groq's vision model."""
+    if not groq_client:
         raise HTTPException(status_code=503, detail="AI service not configured.")
 
     file_bytes = await file.read()
     mime_type = file.content_type or "image/png"
-
-    from google.genai import types
+    data_url = f"data:{mime_type};base64,{base64.b64encode(file_bytes).decode()}"
 
     try:
         response = await asyncio.to_thread(
-            gemini_client.models.generate_content,
-            model=GEMINI_MODEL,
-            contents=[
-                types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-                "Extract ALL text visible in this image. Include any handwritten text, "
-                "printed text, numbers, formulas, diagrams with labels, and table contents. "
-                "Preserve the layout structure as much as possible using markdown formatting. "
-                "If there are mathematical formulas, represent them in LaTeX notation.",
+            groq_client.chat.completions.create,
+            model=GROQ_VISION_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Extract ALL text visible in this image. Include any handwritten text, "
+                            "printed text, numbers, formulas, diagrams with labels, and table contents. "
+                            "Preserve the layout structure as much as possible using markdown formatting. "
+                            "If there are mathematical formulas, represent them in LaTeX notation.",
+                        },
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                    ],
+                }
             ],
-            config=types.GenerateContentConfig(
-                max_output_tokens=4096,
-                temperature=0.1,
-            ),
+            max_tokens=4096,
+            temperature=0.1,
         )
         return {
             "filename": file.filename,
-            "extracted_text": response.text,
+            "extracted_text": response.choices[0].message.content,
             "mime_type": mime_type,
         }
     except Exception as exc:
@@ -582,7 +622,7 @@ async def scrape_url(request: ScrapeRequest):
 
     if request.summarise and text.strip():
         try:
-            summary = await _call_gemini_chunked(
+            summary = await _call_groq_chunked(
                 "You are an expert summariser. Summarise the following web page content concisely. "
                 "Focus on the most important information. Use markdown formatting.",
                 f"URL: {request.url}\nTitle: {title}\n\nContent:\n{text}",
@@ -599,36 +639,19 @@ async def scrape_url(request: ScrapeRequest):
 
 @app.post("/speech-to-text")
 async def speech_to_text(file: UploadFile = File(...)):
-    """Transcribe audio using Gemini's audio understanding or Deepgram."""
+    """Transcribe audio using Groq's Whisper Large v3, falling back to Deepgram."""
     file_bytes = await file.read()
-    mime_type = file.content_type or "audio/wav"
 
-    # Try Gemini first (multimodal audio understanding)
-    if gemini_client:
-        from google.genai import types
+    if groq_client:
         try:
-            response = await asyncio.to_thread(
-                gemini_client.models.generate_content,
-                model=GEMINI_MODEL,
-                contents=[
-                    types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-                    "Transcribe this audio recording accurately. Include speaker labels if "
-                    "multiple speakers are present (e.g., 'Speaker 1:', 'Speaker 2:'). "
-                    "Include timestamps where possible. Preserve filler words and pauses. "
-                    "Output the transcript as clean text.",
-                ],
-                config=types.GenerateContentConfig(
-                    max_output_tokens=8192,
-                    temperature=0.1,
-                ),
-            )
+            transcript = await _transcribe_with_groq(file_bytes, file.filename)
             return {
-                "transcript": response.text,
-                "method": "gemini",
+                "transcript": transcript,
+                "method": "groq",
                 "filename": file.filename,
             }
         except Exception as exc:
-            logger.warning("Gemini STT failed, trying Deepgram: %s", exc)
+            logger.warning("Groq STT failed, trying Deepgram: %s", exc)
 
     # Fallback: Deepgram
     if deepgram_client:
@@ -696,44 +719,26 @@ async def text_to_speech(payload: TTSRequest):
 # ---- Audio Processing (Transcribe + Summarise) ----
 
 @app.post("/process-audio", response_model=AudioResponse)
-async def process_audio(file: UploadFile = File(...)):
+async def process_audio(file: UploadFile = File(...), user=Depends(get_current_user)):
     """Process an audio/video recording: transcribe and summarise."""
-    # First transcribe
     file_bytes = await file.read()
 
-    # Create a fake UploadFile for reuse
     transcript_result = ""
-    if gemini_client:
-        from google.genai import types
+    if groq_client:
         try:
-            response = await asyncio.to_thread(
-                gemini_client.models.generate_content,
-                model=GEMINI_MODEL,
-                contents=[
-                    types.Part.from_bytes(
-                        data=file_bytes,
-                        mime_type=file.content_type or "audio/wav",
-                    ),
-                    "Transcribe this audio recording accurately with speaker labels.",
-                ],
-                config=types.GenerateContentConfig(
-                    max_output_tokens=8192,
-                    temperature=0.1,
-                ),
-            )
-            transcript_result = response.text
+            transcript_result = await _transcribe_with_groq(file_bytes, file.filename)
         except Exception as exc:
-            logger.warning("Gemini audio processing failed: %s", exc)
+            logger.warning("Groq audio processing failed: %s", exc)
 
     if not transcript_result:
-        transcript_result = "[Transcription unavailable — configure Gemini or Deepgram API key]"
+        transcript_result = "[Transcription unavailable — configure GROQ_API_KEY]"
 
     # Then summarise the transcript
     summary = ""
     insights = []
-    if transcript_result and gemini_client:
+    if transcript_result and groq_client:
         try:
-            result = await _call_gemini(
+            result = await _call_groq(
                 "You are an expert educational assistant. Summarise this session transcript. "
                 "Return a JSON object with:\n"
                 '  "summary": concise summary\n'
@@ -761,13 +766,13 @@ async def process_audio(file: UploadFile = File(...)):
 
 @app.post("/fact-check")
 async def fact_check(payload: FactCheckRequest, user=Depends(get_current_user)):
-    """Verify factual claims using web search (Serper) + Gemini evaluation.
+    """Verify factual claims using web search (Serper) + Groq evaluation.
 
     Pipeline:
     1. Detect checkable claims from transcript (if not provided)
     2. For each claim, search the web for evidence (via Serper API)
     3. Cross-reference against uploaded resources if provided
-    4. Feed claim + evidence to Gemini for evaluation
+    4. Feed claim + evidence to Groq for evaluation
     5. Return verdict: TRUE, FALSE, MISLEADING, UNVERIFIABLE
     """
     if not payload.claims and not payload.transcript:
@@ -842,7 +847,7 @@ async def fact_check(payload: FactCheckRequest, user=Depends(get_current_user)):
             eval_prompt += "No external evidence available. Use your knowledge base only.\n"
 
         try:
-            eval_result = await _call_gemini(eval_system, eval_prompt)
+            eval_result = await _call_groq(eval_system, eval_prompt)
             eval_result = eval_result.strip()
             if eval_result.startswith("```"):
                 eval_result = eval_result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -874,7 +879,7 @@ async def fact_check(payload: FactCheckRequest, user=Depends(get_current_user)):
 
 
 async def _detect_claims(transcript: str) -> list[dict]:
-    """Detect factual claims from a transcript segment using Gemini."""
+    """Detect factual claims from a transcript segment using Groq."""
     system_prompt = (
         "You are a fact-check analyst. Identify SPECIFIC, VERIFIABLE factual claims "
         "in a transcript — statistics, dates, events, scientific facts, policy details.\n\n"
@@ -890,7 +895,7 @@ async def _detect_claims(transcript: str) -> list[dict]:
     )
 
     try:
-        result = await _call_gemini_chunked(
+        result = await _call_groq_chunked(
             system_prompt, transcript,
             synthesis_prompt=(
                 "Merge these partial claim extractions into a single JSON array. "
@@ -947,7 +952,7 @@ async def summarise_session(payload: SessionSummaryRequest):
         content += "\n"
 
     try:
-        result = await _call_gemini_chunked(system_prompt, content)
+        result = await _call_groq_chunked(system_prompt, content)
         return {"summary": result}
     except Exception as exc:
         logger.exception("Session summary error")
@@ -980,7 +985,7 @@ async def generate_livestream_notes(payload: LivestreamAINotesRequest):
     full_text = f"Live Session Transcript:{context_str}\n\n{payload.transcript}"
 
     try:
-        result = await _call_gemini_chunked(
+        result = await _call_groq_chunked(
             system_prompt, full_text,
             synthesis_prompt=(
                 "Merge these partial note sets from the same session into a single cohesive set. "
@@ -1164,3 +1169,160 @@ async def send_application_email(input: ApplicationEmailInput):
         raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
 
     return {"status": "sent"}
+
+
+# ---- Booking Confirmation Email ----
+
+def _build_booking_email_html(data: BookingEmailInput) -> str:
+    """Build a branded, responsive HTML email for booking confirmations."""
+    is_intro = data.booking_type == "intro_call"
+    heading = "Intro Call Confirmed!" if is_intro else "Session Booking Confirmed!"
+    emoji = "☕" if is_intro else "🎉"
+
+    # Provider avatar section (circular image or fallback initials)
+    if data.provider_image:
+        avatar_html = (
+            f'<img src="{data.provider_image}" alt="{data.provider_name}" '
+            f'style="width:80px;height:80px;border-radius:50%;object-fit:cover;'
+            f'border:3px solid #8BB73F;" />'
+        )
+    else:
+        initials = "".join(w[0].upper() for w in data.provider_name.split()[:2])
+        avatar_html = (
+            f'<div style="width:80px;height:80px;border-radius:50%;'
+            f'background:linear-gradient(135deg,#8BB73F,#4A5D23);color:#fff;'
+            f'display:inline-flex;align-items:center;justify-content:center;'
+            f'font-size:28px;font-weight:700;border:3px solid #8BB73F;">'
+            f'{initials}</div>'
+        )
+
+    # Cost row (only show if provided)
+    cost_row = ""
+    if data.cost:
+        cost_row = (
+            '<tr>'
+            '<td style="padding:10px 16px;color:#64748b;font-size:14px;border-bottom:1px solid #f1f5f9;">💰 Cost</td>'
+            f'<td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">{data.cost}</td>'
+            '</tr>'
+        )
+
+    # Topic row
+    topic_row = ""
+    if data.topic:
+        topic_row = (
+            '<tr>'
+            '<td style="padding:10px 16px;color:#64748b;font-size:14px;border-bottom:1px solid #f1f5f9;">📚 Topic</td>'
+            f'<td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">{data.topic}</td>'
+            '</tr>'
+        )
+
+    # Notes row
+    notes_row = ""
+    if data.notes:
+        notes_row = (
+            '<tr>'
+            '<td style="padding:10px 16px;color:#64748b;font-size:14px;">📝 Notes</td>'
+            f'<td style="padding:10px 16px;color:#1e293b;font-size:14px;">{data.notes}</td>'
+            '</tr>'
+        )
+
+    return f"""<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background-color:#f8fafc;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+  <div style="max-width:600px;margin:40px auto;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#8BB73F 0%,#6a9a2e 100%);padding:30px;text-align:center;">
+      <h1 style="color:#ffffff;margin:0;font-size:24px;letter-spacing:1px;">TutorMina</h1>
+    </div>
+
+    <!-- Emoji + Heading -->
+    <div style="text-align:center;padding:30px 30px 10px;">
+      <div style="font-size:48px;margin-bottom:10px;">{emoji}</div>
+      <h2 style="color:#4A5D23;margin:0;font-size:22px;">{heading}</h2>
+      <p style="color:#64748b;font-size:15px;margin-top:8px;">
+        Hi {data.student_name}, your {"intro call" if is_intro else "session"} has been booked!
+      </p>
+    </div>
+
+    <!-- Provider Card -->
+    <div style="text-align:center;padding:20px 30px;">
+      <div style="display:inline-block;padding:20px 30px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
+        {avatar_html}
+        <div style="margin-top:10px;font-size:18px;font-weight:700;color:#1e293b;">{data.provider_name}</div>
+        <div style="color:#8BB73F;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Your Professional</div>
+      </div>
+    </div>
+
+    <!-- Session Details Table -->
+    <div style="padding:10px 30px 20px;">
+      <table style="width:100%;border-collapse:collapse;background:#fafbfc;border-radius:8px;overflow:hidden;">
+        <tr>
+          <td style="padding:10px 16px;color:#64748b;font-size:14px;border-bottom:1px solid #f1f5f9;">📅 Date</td>
+          <td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">{data.date}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 16px;color:#64748b;font-size:14px;border-bottom:1px solid #f1f5f9;">⏰ Time</td>
+          <td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">{data.time}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 16px;color:#64748b;font-size:14px;border-bottom:1px solid #f1f5f9;">⏱️ Duration</td>
+          <td style="padding:10px 16px;color:#1e293b;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">{data.duration}</td>
+        </tr>
+        {cost_row}
+        {topic_row}
+        {notes_row}
+      </table>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="text-align:center;padding:10px 30px 30px;">
+      <a href="{data.login_url}" style="background-color:#8BB73F;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;display:inline-block;box-shadow:0 2px 8px rgba(139,183,63,0.3);">
+        Go to My Dashboard
+      </a>
+      <p style="color:#94a3b8;font-size:13px;margin-top:14px;">
+        Need to make changes? Log in to your dashboard to reschedule or message your professional.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color:#f1f5f9;padding:20px;text-align:center;color:#94a3b8;font-size:12px;">
+      &copy; 2026 TutorMina. All rights reserved.
+    </div>
+
+  </div>
+</body>
+</html>"""
+
+
+@app.post("/send-booking-email")
+async def send_booking_email(input: BookingEmailInput):
+    """Send a beautifully branded booking confirmation email."""
+    html = _build_booking_email_html(input)
+    is_intro = input.booking_type == "intro_call"
+    subject = (
+        f"☕ Intro call booked with {input.provider_name}"
+        if is_intro
+        else f"🎉 Session booked with {input.provider_name}"
+    )
+
+    try:
+        if RESEND_API_KEY and resend:
+            resend.Emails.send({
+                "from": EMAIL_FROM,
+                "to": input.to,
+                "subject": subject,
+                "html": html,
+            })
+        else:
+            message = MIMEText(html, "html")
+            message["Subject"] = subject
+            message["From"] = EMAIL_FROM
+            message["To"] = input.to
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+                server.send_message(message)
+    except Exception as exc:
+        logger.exception("Failed to send booking email")
+        raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
+
+    return {"status": "sent", "subject": subject}

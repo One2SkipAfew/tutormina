@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend", "--", "--port", "5555", "--strictPort"],
+      "port": 5555
+    },
+    {
+      "name": "ai-api",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\kmthu\\projects\\tutormina\\ai-api && set ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5555,http://localhost:3000,https://tutormina.netlify.app && venv\\Scripts\\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000"],
+      "port": 8000
+    }
+  ]
+}

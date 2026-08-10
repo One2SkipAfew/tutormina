@@ -28,6 +28,7 @@ export interface ProviderDetails {
   profile_id: string;
   bio: string | null;
   qualifications: string | null;
+  qualifications_file_url: string | null;
   avatar_url: string | null;
   location: string | null;
   travel_radius_km: number | null;

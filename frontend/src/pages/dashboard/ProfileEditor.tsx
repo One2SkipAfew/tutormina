@@ -3,9 +3,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { getZoneColor } from '../../types/lms';
 import type { StudentType } from '../../types/lms';
-import { getProviderDetails, saveProviderDetails, uploadProfessionalPhoto, uploadAvatar } from '../../lib/vetting';
+import { getProviderDetails, saveProviderDetails, uploadProfessionalPhoto, uploadAvatar, uploadProviderQualifications } from '../../lib/vetting';
 import { getStudentDetails, saveStudentDetails, uploadStudentDocument, extractDocumentInsights, getStudentTypeLabels } from '../../lib/studentDetails';
-import { useModal } from '../../contexts/NotificationContext';
+import { useModal, useToast } from '../../contexts/NotificationContext';
 import '../../styles/vetting.css';
 import '../../styles/messaging.css';
 
@@ -27,7 +27,9 @@ export default function ProfileEditor() {
   const [rateCurrency, setRateCurrency] = useState<'USD' | 'EUR' | 'ZAR'>('ZAR');
   const [rateVisible, setRateVisible] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [qualificationsFileUrl, setQualificationsFileUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingQualifications, setUploadingQualifications] = useState(false);
 
   // Student "About You" (customer role)
   const [studentType, setStudentType] = useState<StudentType | ''>('');
@@ -53,6 +55,7 @@ export default function ProfileEditor() {
 
   const [loading, setLoading] = useState(false);
   const { showModal } = useModal();
+  const { showToast } = useToast();
 
   const role = profile?.role ?? 'customer';
   const zone = getZoneColor(role);
@@ -84,6 +87,7 @@ export default function ProfileEditor() {
         setRateCurrency(details.rate_currency ?? 'ZAR');
         setRateVisible(details.rate_visible ?? false);
         setAvatarUrl(details.avatar_url);
+        setQualificationsFileUrl(details.qualifications_file_url ?? null);
       }
     } catch (err) {
       showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load profile details', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
@@ -180,7 +184,12 @@ export default function ProfileEditor() {
 
   const handleAddSpecialty = () => {
     const trimmed = specialtyDraft.trim();
-    if (trimmed && !specialties.includes(trimmed)) setSpecialties([...specialties, trimmed]);
+    if (!trimmed) return;
+    if (trimmed.length > 25 || trimmed.split(/\s+/).length > 2) {
+      showToast('error', 'Specialties must be 1-2 words and under 25 characters. Please use the Bio for longer descriptions.');
+      return;
+    }
+    if (!specialties.includes(trimmed)) setSpecialties([...specialties, trimmed]);
     setSpecialtyDraft('');
   };
 
@@ -207,6 +216,7 @@ export default function ProfileEditor() {
         await saveProviderDetails({
           bio,
           qualifications,
+          qualifications_file_url: qualificationsFileUrl,
           phone_number: phone,
           location,
           contact_preference: contactPreference,
@@ -383,18 +393,18 @@ export default function ProfileEditor() {
             </div>
             <div className="content-panel-body" style={{ maxWidth: '600px' }}>
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Bio</label>
+                <label style={labelStyle}>Bio &amp; Detailed Description</label>
                 <textarea
                   value={bio}
                   onChange={e => setBio(e.target.value)}
-                  placeholder="Tell students about your experience, teaching style, and specializations..."
+                  placeholder="Tell students about your experience, teaching style, and specializations in detail..."
                   rows={4}
                   style={{ ...inputStyle, resize: 'vertical', minHeight: '100px' }}
                 />
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Qualifications</label>
+                <label style={labelStyle}>Qualifications Overview</label>
                 <input
                   type="text"
                   value={qualifications}
@@ -405,7 +415,41 @@ export default function ProfileEditor() {
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <label style={labelStyle}>Specialities</label>
+                <label style={labelStyle}>Qualifications Document</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {qualificationsFileUrl && (
+                    <a href={qualificationsFileUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.9rem', color: 'var(--color-primary-dark)' }}>
+                      View Uploaded File
+                    </a>
+                  )}
+                  <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+                    {uploadingQualifications ? 'Uploading...' : qualificationsFileUrl ? 'Replace file' : 'Upload document'}
+                    <input 
+                      type="file" 
+                      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" 
+                      hidden 
+                      disabled={uploadingQualifications}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingQualifications(true);
+                        try {
+                          const url = await uploadProviderQualifications(file);
+                          setQualificationsFileUrl(url);
+                          showToast('success', 'Qualifications uploaded successfully');
+                        } catch (err) {
+                          showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload qualifications', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+                        } finally {
+                          setUploadingQualifications(false);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={labelStyle}>Specialities (Max 2 words per tag)</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input
                     type="text"

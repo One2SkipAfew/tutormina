@@ -189,18 +189,21 @@ export default function ProviderTile({ profile, details, onBook, onBookIntro }: 
           marginBottom: '1.5rem',
           marginTop: 'auto'
         }}>
-          {specialties.slice(0, 5).map(spec => (
-            <span key={spec} style={{
-              fontSize: '0.7rem',
-              padding: '0.2rem 0.5rem',
-              borderRadius: '4px',
-              background: '#f1f5f9',
-              color: '#334155',
-              border: '1px solid #e2e8f0',
-            }}>
-              {spec}
-            </span>
-          ))}
+          {specialties.slice(0, 5).map(spec => {
+            const displaySpec = spec.length > 25 ? spec.substring(0, 22) + '...' : spec;
+            return (
+              <span key={spec} style={{
+                fontSize: '0.7rem',
+                padding: '0.2rem 0.5rem',
+                borderRadius: '4px',
+                background: '#f1f5f9',
+                color: '#334155',
+                border: '1px solid #e2e8f0',
+              }}>
+                {displaySpec}
+              </span>
+            );
+          })}
           {specialties.length > 5 && (
             <span style={{
               fontSize: '0.7rem',

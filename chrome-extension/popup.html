@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>TutorMina Chommie</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="header">
+    <span class="dot" id="statusDot"></span>
+    <h1>Chommie</h1>
+  </div>
+
+  <div id="loginView" class="view">
+    <p class="hint">Sign in with your TutorMina account to start capturing sessions.</p>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="signInBtn" class="primary">Sign in</button>
+    <p id="loginError" class="error"></p>
+  </div>
+
+  <div id="mainView" class="view" style="display:none">
+    <p class="hint" id="platformHint">Detecting meeting platform…</p>
+
+    <div id="micSetupNotice" style="display:none">
+      <p class="hint">Microphone access hasn't been granted yet. This is a one-time setup done from a regular tab (extensions can't show permission prompts from their popup).</p>
+      <button id="openSetupBtn" class="primary">Open microphone setup</button>
+    </div>
+
+    <div id="idleControls">
+      <label class="consent">
+        <input type="checkbox" id="consentCheckbox" />
+        I have permission to record this meeting and will let other participants know.
+      </label>
+      <button id="startBtn" class="primary" disabled>Start Chommie</button>
+    </div>
+
+    <div id="recordingControls" style="display:none">
+      <div class="recording-indicator">
+        <span class="pulse"></span>
+        <span id="timer">00:00</span>
+      </div>
+      <button id="stopBtn" class="danger">Stop &amp; Upload</button>
+    </div>
+
+    <div id="processingControls" style="display:none">
+      <p class="hint">Uploading and processing… you can close this popup, it'll keep going.</p>
+    </div>
+
+    <p id="mainError" class="error"></p>
+    <button id="signOutBtn" class="link">Sign out</button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="supabaseRest.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

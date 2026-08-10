@@ -37,10 +37,28 @@ export async function uploadProfessionalPhoto(file: File): Promise<string> {
   return publicUrl;
 }
 
+export async function uploadProviderQualifications(file: File): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const ext = file.name.split('.').pop();
+  const timestamp = new Date().getTime();
+  const storagePath = `${user.id}/qualifications_${timestamp}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(storagePath, file, { cacheControl: '3600', upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  const { data: urlData } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(storagePath);
+  return urlData.publicUrl;
+}
+
 // ============ PROVIDER DETAILS ============
 
 export type ProviderDetailsInput = Partial<Pick<ProviderDetails,
-  'bio' | 'qualifications' | 'specialties' | 'years_of_experience' | 'location' | 'phone_number' |
+  'bio' | 'qualifications' | 'qualifications_file_url' | 'specialties' | 'years_of_experience' | 'location' | 'phone_number' |
   'contact_preference' | 'offers_in_person' | 'offers_virtual' |
   'rate_amount' | 'rate_currency' | 'rate_visible'
 >>;

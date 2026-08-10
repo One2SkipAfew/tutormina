@@ -144,23 +144,26 @@ export default function Directory() {
 
           {visibleSpecialties.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', maxWidth: '700px' }}>
-              {visibleSpecialties.map(spec => (
-                <button
-                  key={spec}
-                  onClick={() => toggleSpecialty(spec)}
-                  style={{
-                    fontSize: '0.8rem',
-                    padding: '0.35rem 0.85rem',
-                    borderRadius: '16px',
-                    border: selectedSpecialties.includes(spec) ? '1px solid var(--color-primary-dark)' : '1px solid #e2e8f0',
-                    background: selectedSpecialties.includes(spec) ? 'var(--color-primary-dark)' : '#fff',
-                    color: selectedSpecialties.includes(spec) ? '#fff' : '#475569',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {spec}
-                </button>
-              ))}
+              {visibleSpecialties.map(spec => {
+                const displaySpec = spec.length > 25 ? spec.substring(0, 22) + '...' : spec;
+                return (
+                  <button
+                    key={spec}
+                    onClick={() => toggleSpecialty(spec)}
+                    style={{
+                      fontSize: '0.8rem',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '16px',
+                      border: selectedSpecialties.includes(spec) ? '1px solid var(--color-primary-dark)' : '1px solid #e2e8f0',
+                      background: selectedSpecialties.includes(spec) ? 'var(--color-primary-dark)' : '#fff',
+                      color: selectedSpecialties.includes(spec) ? '#fff' : '#475569',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {displaySpec}
+                  </button>
+                );
+              })}
               {selectedSpecialties.length > 0 && (
                 <button
                   onClick={() => setSelectedSpecialties([])}
