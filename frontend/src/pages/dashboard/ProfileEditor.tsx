@@ -5,6 +5,7 @@ import { getZoneColor } from '../../types/lms';
 import type { StudentType } from '../../types/lms';
 import { getProviderDetails, saveProviderDetails, uploadProfessionalPhoto, uploadAvatar } from '../../lib/vetting';
 import { getStudentDetails, saveStudentDetails, uploadStudentDocument, extractDocumentInsights, getStudentTypeLabels } from '../../lib/studentDetails';
+import { useModal } from '../../contexts/NotificationContext';
 import '../../styles/vetting.css';
 import '../../styles/messaging.css';
 
@@ -51,8 +52,7 @@ export default function ProfileEditor() {
   const [extractingAI, setExtractingAI] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const role = profile?.role ?? 'customer';
   const zone = getZoneColor(role);
@@ -86,7 +86,7 @@ export default function ProfileEditor() {
         setAvatarUrl(details.avatar_url);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile details');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load profile details', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   }, [isProvider]);
 
@@ -116,7 +116,7 @@ export default function ProfileEditor() {
         setDocumentSummary(details.document_extracted_summary ?? '');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load student details');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load student details', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   }, [isProvider]);
 
@@ -135,12 +135,11 @@ export default function ProfileEditor() {
     if (!file) return;
     setPendingDocumentFile(file);
     setUploadingDocument(true);
-    setError(null);
     try {
       const url = await uploadStudentDocument(file);
       setDocumentUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload document');
+      showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload document', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploadingDocument(false);
     }
@@ -161,7 +160,6 @@ export default function ProfileEditor() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
     setUploadingPhoto(true);
-    setError(null);
     try {
       if (isProvider) {
         const url = await uploadProfessionalPhoto(file);
@@ -174,7 +172,7 @@ export default function ProfileEditor() {
         await refreshProfile();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photo');
+      showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload photo', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploadingPhoto(false);
     }
@@ -191,8 +189,6 @@ export default function ProfileEditor() {
   const handleSave = async () => {
     if (!profile) return;
     setLoading(true);
-    setError(null);
-    setSaved(false);
 
     const draft = specialtyDraft.trim();
     const finalSpecialties = draft && !specialties.includes(draft) ? [...specialties, draft] : specialties;
@@ -249,10 +245,17 @@ export default function ProfileEditor() {
       setSpecialties(finalSpecialties);
       setSpecialtyDraft('');
       await refreshProfile();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      showModal({
+        type: 'success',
+        title: 'Profile Saved!',
+        message: 'Your profile changes have been saved successfully.',
+        buttons: [
+          { label: 'Continue Editing', variant: 'outline', onClick: 'dismiss' },
+          { label: 'Go to Dashboard', variant: 'primary', onClick: () => { window.location.href = '/dashboard'; } }
+        ]
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save profile');
+      showModal({ type: 'error', title: 'Save Failed', message: err instanceof Error ? err.message : 'Failed to save profile', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setLoading(false);
     }
@@ -265,14 +268,6 @@ export default function ProfileEditor() {
       : zone === 'admin'
         ? 'var(--zone-admin)'
         : 'var(--zone-student)';
-
-  const zoneBg = zone === 'tutor'
-    ? 'var(--zone-tutor-light)'
-    : zone === 'coach'
-      ? 'var(--zone-coach-light)'
-      : zone === 'admin'
-        ? 'var(--zone-admin-light)'
-        : 'var(--zone-student-light)';
 
   const zoneGradient = zone === 'tutor'
     ? 'var(--zone-tutor-gradient)'
@@ -351,22 +346,7 @@ export default function ProfileEditor() {
         </div>
       </div>
 
-      {/* Error/Success Messages */}
-      {error && (
-        <div style={{ padding: '0.75rem 1rem', background: '#FFEBEE', border: '1px solid #EF9A9A', borderRadius: '8px', color: '#C62828', fontSize: '0.85rem', marginBottom: '1rem' }}>
-          {error}
-        </div>
-      )}
 
-      {saved && (
-        <div style={{
-          padding: '0.75rem 1rem', background: zoneBg, border: `1px solid ${zoneColor}`, borderRadius: '8px',
-          color: zone === 'tutor' ? 'var(--zone-tutor-dark)' : zone === 'coach' ? 'var(--zone-coach-dark)' : zone === 'admin' ? 'var(--zone-admin-dark)' : 'var(--zone-student-dark)',
-          fontSize: '0.85rem', marginBottom: '1rem',
-        }}>
-          ✅ Profile saved successfully!
-        </div>
-      )}
 
       {/* Profile Form */}
       <div className="content-panel" style={{ marginBottom: '1.5rem' }}>

@@ -14,6 +14,7 @@ import {
   deleteReference,
   submitApplication,
 } from '../lib/vetting';
+import { useModal } from '../contexts/NotificationContext';
 import '../styles/vetting.css';
 
 export default function VettingApplication() {
@@ -22,7 +23,7 @@ export default function VettingApplication() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -80,7 +81,7 @@ export default function VettingApplication() {
       setWorkExperiences(we);
       setReferences(refs);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load application');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load application', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setLoading(false);
     }
@@ -92,12 +93,11 @@ export default function VettingApplication() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingPhoto(true);
-    setError(null);
     try {
       const url = await uploadProfessionalPhoto(file);
       setAvatarUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photo');
+      showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload photo', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploadingPhoto(false);
     }
@@ -115,7 +115,6 @@ export default function VettingApplication() {
 
   const handleSaveDetails = async () => {
     setSaving(true);
-    setError(null);
     const draft = specialtyDraft.trim();
     const finalSpecialties = draft && !specialties.includes(draft) ? [...specialties, draft] : specialties;
     try {
@@ -135,8 +134,9 @@ export default function VettingApplication() {
       });
       setSpecialties(finalSpecialties);
       setSpecialtyDraft('');
+      showModal({ type: 'success', title: 'Draft Saved', message: 'Your progress has been saved.', buttons: [{ label: 'Continue Editing', variant: 'primary', onClick: 'dismiss' }] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save details');
+      showModal({ type: 'error', title: 'Save Failed', message: err instanceof Error ? err.message : 'Failed to save details', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setSaving(false);
     }
@@ -155,7 +155,7 @@ export default function VettingApplication() {
       setWorkExperiences([entry, ...workExperiences]);
       setWeCompany(''); setWeTitle(''); setWeStart(''); setWeEnd(''); setWeDescription('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add work experience');
+      showModal({ type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Failed to add work experience', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -171,20 +171,24 @@ export default function VettingApplication() {
       setReferences([entry, ...references]);
       setRefName(''); setRefRelationship(''); setRefContact(''); setRefComment('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add reference');
+      showModal({ type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Failed to add reference', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
   const handleSubmit = async () => {
     setSaving(true);
-    setError(null);
     try {
       await handleSaveDetails();
       await submitApplication();
       await refreshProfile();
-      navigate('/application-status');
+      showModal({
+        type: 'success',
+        title: 'Application Submitted!',
+        message: 'Your application has been received and is under review.',
+        buttons: [{ label: 'View Application Status', variant: 'primary', onClick: () => navigate('/application-status') }]
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit application');
+      showModal({ type: 'error', title: 'Submission Failed', message: err instanceof Error ? err.message : 'Failed to submit application', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setSaving(false);
     }
@@ -203,11 +207,7 @@ export default function VettingApplication() {
         Tell students about your background so we can review and approve your profile.
       </p>
 
-      {error && (
-        <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-          {error}
-        </div>
-      )}
+
 
       <div className="glass-card vetting-section">
         <h3>Photo</h3>

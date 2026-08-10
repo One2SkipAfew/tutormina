@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { saveSessionNote, getSessionNotes, deleteSessionNote, type AiSessionNote } from '../../lib/aiNotes';
 import { summariseText, extractKeyTopics, parsePdf, extractImageText, scrapeUrl, speechToText, textToSpeech } from '../../lib/aiApi';
 import { FileText, Image as ImageIcon, Globe, Mic, Volume2, Sparkles, Video, Search, FileJson } from 'lucide-react';
+import { useModal } from '../../contexts/NotificationContext';
 import '../../styles/shared-drive.css';
 import '../../styles/messaging.css';
 
@@ -22,7 +23,7 @@ export default function AIInsights() {
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const [savedNotes, setSavedNotes] = useState<AiSessionNote[]>([]);
   const [noteTitle, setNoteTitle] = useState('');
@@ -47,7 +48,6 @@ export default function AIInsights() {
     setTopics([]);
     setExtractedText(null);
     setAudioUrl(null);
-    setError(null);
   };
 
   const handleTabChange = (tab: ToolTab) => {
@@ -89,7 +89,7 @@ export default function AIInsights() {
       setSummary(res.summary);
       setTopics(res.key_points || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to summarise text');
+      showModal({ type: 'error', title: 'Processing Failed', message: err instanceof Error ? err.message : 'Failed to summarise text', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -100,7 +100,7 @@ export default function AIInsights() {
       const res = await extractKeyTopics(textInput);
       setTopics(res.key_topics || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to extract topics');
+      showModal({ type: 'error', title: 'Extraction Failed', message: err instanceof Error ? err.message : 'Failed to extract topics', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -112,7 +112,7 @@ export default function AIInsights() {
       setExtractedText(res.text);
       setSummary(`Extracted ${res.word_count} words from a ${res.page_count} page PDF.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse PDF');
+      showModal({ type: 'error', title: 'Parse Failed', message: err instanceof Error ? err.message : 'Failed to parse PDF', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -123,7 +123,7 @@ export default function AIInsights() {
       const res = await extractImageText(selectedFile);
       setExtractedText(res.extracted_text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to extract text from image');
+      showModal({ type: 'error', title: 'Extraction Failed', message: err instanceof Error ? err.message : 'Failed to extract text from image', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -135,7 +135,7 @@ export default function AIInsights() {
       setExtractedText(res.text);
       setSummary(res.summary || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to scrape URL');
+      showModal({ type: 'error', title: 'Scraping Failed', message: err instanceof Error ? err.message : 'Failed to scrape URL', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -147,7 +147,7 @@ export default function AIInsights() {
       setExtractedText(res.transcript);
       setSummary(`Transcribed via ${res.method}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
+      showModal({ type: 'error', title: 'Transcription Failed', message: err instanceof Error ? err.message : 'Failed to transcribe audio', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -158,7 +158,7 @@ export default function AIInsights() {
       const url = await textToSpeech(textInput);
       setAudioUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate speech');
+      showModal({ type: 'error', title: 'Generation Failed', message: err instanceof Error ? err.message : 'Failed to generate speech', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally { setLoading(false); }
   };
 
@@ -256,11 +256,7 @@ export default function AIInsights() {
       {/* Inputs */}
       <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
         <div className="content-panel-body">
-          {error && (
-            <div style={{ background: '#fce8e6', color: '#c5221f', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-              {error}
-            </div>
-          )}
+
 
           {activeTab === 'text' && (
             <>

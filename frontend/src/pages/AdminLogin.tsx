@@ -2,23 +2,31 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import { useModal } from '../contexts/NotificationContext';
 
 export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      setError(error.message);
+      showModal({
+        type: 'error',
+        title: 'Login Failed',
+        message: error.message === 'Invalid login credentials' ? 'The email or password you entered is incorrect.' : error.message,
+        buttons: [
+          { label: 'Try Again', variant: 'outline', onClick: 'dismiss' },
+          { label: 'Forgot Password?', variant: 'primary', onClick: () => { window.location.href = '/forgot-password'; } },
+        ],
+      });
       setLoading(false);
       return;
     }
@@ -26,13 +34,11 @@ export default function AdminLogin() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
     if (profile?.role !== 'admin') {
       await supabase.auth.signOut();
-      setError('This account does not have admin access.');
+      showModal({ type: 'error', title: 'Access Denied', message: 'This account does not have admin access.' });
       setLoading(false);
       return;
     }
 
-    // Full reload so AuthContext fetches the profile fresh rather than racing its own
-    // async post-sign-in state.
     window.location.href = '/dashboard/admin/applications';
     setLoading(false);
   };
@@ -44,11 +50,7 @@ export default function AdminLogin() {
           Admin Access
         </h2>
 
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
+
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>

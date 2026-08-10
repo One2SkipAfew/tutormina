@@ -1,27 +1,31 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { useModal } from '../contexts/NotificationContext';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
-    setMessage(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
 
     if (error) {
-      setError(error.message);
+      showModal({ type: 'error', title: 'Reset Failed', message: error.message, buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } else {
-      setMessage('Password reset instructions sent. Please check your email.');
+      showModal({
+        type: 'info',
+        title: 'Check Your Email',
+        message: `We've sent password reset instructions to ${email}. Please check your inbox and spam folder.`,
+        buttons: [{ label: 'Back to Login', variant: 'primary', onClick: () => navigate('/login') }],
+      });
     }
     setLoading(false);
   };
@@ -32,18 +36,6 @@ export default function ForgotPassword() {
         <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--color-olive-dark)' }}>
           Reset Password
         </h2>
-
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-
-        {message && (
-          <div style={{ backgroundColor: '#e8f5e9', color: '#2e7d32', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {message}
-          </div>
-        )}
 
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem', textAlign: 'center' }}>
           Enter your email address and we'll send you a link to reset your password.

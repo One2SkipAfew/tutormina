@@ -12,6 +12,7 @@ import { useRealtimeTranscript } from '../../lib/useRealtimeTranscript';
 import { useFactChecker } from '../../lib/useFactChecker';
 import { generateLiveNotes, summariseSession } from '../../lib/aiApi';
 import { supabase } from '../../lib/supabaseClient';
+import { useModal } from '../../contexts/NotificationContext';
 import '../../styles/live-session.css';
 
 const formatTime = (secs: number): string => {
@@ -45,7 +46,7 @@ export default function VideoRoom() {
     booking_id: string | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { showModal } = useModal();
 
   // Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -83,8 +84,13 @@ export default function VideoRoom() {
         .single();
 
       if (err || !data) {
-        setError('Room not found or you do not have access.');
         setLoading(false);
+        showModal({ 
+          type: 'error', 
+          title: 'Room Not Found', 
+          message: 'This video room does not exist or you do not have access.', 
+          buttons: [{ label: 'Back to Bookings', variant: 'primary', onClick: () => navigate('/dashboard/bookings') }] 
+        });
         return;
       }
 
@@ -191,16 +197,8 @@ export default function VideoRoom() {
     );
   }
 
-  if (error || !room) {
-    return (
-      <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
-        <h2 style={{ marginBottom: '1rem' }}>⚠️ Room Not Found</h2>
-        <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>{error || 'This video room does not exist.'}</p>
-        <button className="btn btn-primary" onClick={() => navigate('/dashboard/bookings')}>
-          Back to Bookings
-        </button>
-      </div>
-    );
+  if (!room) {
+    return null;
   }
 
   return (

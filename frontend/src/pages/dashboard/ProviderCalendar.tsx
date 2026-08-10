@@ -17,6 +17,7 @@ import {
 } from '../../lib/bookings';
 import { getOrCreateConversation } from '../../lib/messaging';
 import { expandAvailability, toDateKey } from '../../lib/availability';
+import { useModal } from '../../contexts/NotificationContext';
 
 interface PopulatedBooking extends Booking {
   customer: {
@@ -143,7 +144,7 @@ export default function ProviderCalendar() {
 
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
-  const [availError, setAvailError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const [ruleFrequency, setRuleFrequency] = useState<RuleFrequencyOption>('weekly');
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
@@ -180,7 +181,7 @@ export default function ProviderCalendar() {
   const loadAvailability = () => {
     Promise.all([getMyAvailabilityRules(), getMyAvailabilityExceptions()])
       .then(([r, e]) => { setRules(r); setExceptions(e); })
-      .catch((err) => setAvailError(err instanceof Error ? err.message : 'Failed to load availability'));
+      .catch((err) => showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load availability', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] }));
   };
 
   useEffect(() => { loadAvailability(); }, []);
@@ -190,9 +191,8 @@ export default function ProviderCalendar() {
   };
 
   const handleAddRule = async () => {
-    setAvailError(null);
     if (ruleStart >= ruleEnd) {
-      setAvailError('Start time must be before end time.');
+      showModal({ type: 'error', title: 'Invalid Time', message: 'Start time must be before end time.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
       return;
     }
     try {
@@ -202,11 +202,11 @@ export default function ProviderCalendar() {
         setExceptions((prev) => [...prev, exc].sort((a, b) => a.specific_date.localeCompare(b.specific_date)));
       } else {
         if (ruleFrequency === 'weekly' && selectedDays.length === 0) {
-          setAvailError('Select at least one day of the week.');
+          showModal({ type: 'error', title: 'Invalid Rule', message: 'Select at least one day of the week.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
           return;
         }
         if ((ruleFrequency === 'monthly' || ruleFrequency === 'quarterly' || ruleFrequency === 'yearly') && !dayOfMonth) {
-          setAvailError('Enter a day of the month.');
+          showModal({ type: 'error', title: 'Invalid Rule', message: 'Enter a day of the month.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
           return;
         }
         const rule = await addAvailabilityRule({
@@ -222,7 +222,7 @@ export default function ProviderCalendar() {
       }
       setSelectedDays([]);
     } catch (err) {
-      setAvailError(err instanceof Error ? err.message : 'Failed to add availability');
+      showModal({ type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Failed to add availability', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -237,12 +237,11 @@ export default function ProviderCalendar() {
   };
 
   const handleBlockDate = async () => {
-    setAvailError(null);
     try {
       const exc = await addAvailabilityException({ specific_date: toDateKey(selectedDate), is_available: false, note: 'Blocked' });
       setExceptions((prev) => [...prev, exc].sort((a, b) => a.specific_date.localeCompare(b.specific_date)));
     } catch (err) {
-      setAvailError(err instanceof Error ? err.message : 'Failed to block date');
+      showModal({ type: 'error', title: 'Block Failed', message: err instanceof Error ? err.message : 'Failed to block date', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -633,11 +632,7 @@ export default function ProviderCalendar() {
             </p>
           </div>
           <div className="content-panel-body" style={{ fontFamily: 'var(--font-sans, inherit)' }}>
-            {availError && (
-              <div style={{ background: '#fce8e6', color: '#c5221f', padding: '0.7rem 0.9rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {availError}
-              </div>
-            )}
+
 
             <label style={availLabelStyle}>Repeats</label>
             <select

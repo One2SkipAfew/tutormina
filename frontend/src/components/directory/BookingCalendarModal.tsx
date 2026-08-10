@@ -245,6 +245,42 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
     } catch {
       // Non-fatal - the booking itself already succeeded.
     }
+
+    // Best-effort: send a beautiful booking confirmation email to the student.
+    try {
+      const aiApiUrl = import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8000';
+      const endTime = new Date(sessionDate.getTime() + selectedDuration * 60000);
+      const providerAvatar = provider.provider_details?.avatar_url || provider.avatar_url || undefined;
+
+      // Build cost string from provider rate if available
+      let costStr: string | undefined;
+      if (provider.provider_details?.rate_amount != null && provider.provider_details.rate_visible) {
+        const symbols: Record<string, string> = { USD: '$', EUR: '€', ZAR: 'R' };
+        const sym = symbols[provider.provider_details.rate_currency] || provider.provider_details.rate_currency;
+        costStr = `${sym}${provider.provider_details.rate_amount}/hr`;
+      }
+
+      await fetch(`${aiApiUrl}/send-booking-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: currentUser.email,
+          student_name: currentUser.first_name,
+          provider_name: `${provider.first_name} ${provider.last_name}`,
+          provider_image: providerAvatar,
+          date: sessionDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+          time: `${selectedSlot} – ${endTime.toTimeString().slice(0, 5)}`,
+          duration: `${selectedDuration} minutes`,
+          cost: costStr,
+          topic: topic || undefined,
+          notes: note.trim() || undefined,
+          booking_type: bookingType,
+          login_url: `${window.location.origin}/dashboard/bookings`,
+        }),
+      });
+    } catch {
+      // Non-fatal — booking confirmation email is best-effort.
+    }
   };
 
   // Calendar generation helpers

@@ -19,6 +19,7 @@ import {
   HelpCircle,
   Clock,
 } from 'lucide-react';
+import { useModal } from '../../contexts/NotificationContext';
 
 const VERDICT_CONFIG: Record<string, { color: string; bg: string }> = {
   TRUE: { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
@@ -61,7 +62,7 @@ export default function SessionRecordings() {
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadConsent, setUploadConsent] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { showModal } = useModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadRecordings = useCallback(async () => {
@@ -101,7 +102,6 @@ export default function SessionRecordings() {
     if (!file || !profile || !uploadConsent) return;
 
     setUploading(true);
-    setUploadError(null);
     try {
       const recording = await uploadRecording(file, profile.id, {
         title: uploadTitle.trim() || file.name,
@@ -121,7 +121,7 @@ export default function SessionRecordings() {
         });
     } catch (err: any) {
       console.error('Upload failed:', err);
-      setUploadError(err?.message || 'Upload failed. Please try again.');
+      showModal({ type: 'error', title: 'Upload Failed', message: err?.message || 'Upload failed. Please try again.', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploading(false);
     }
@@ -269,7 +269,7 @@ export default function SessionRecordings() {
               <input type="checkbox" checked={uploadConsent} onChange={(e) => setUploadConsent(e.target.checked)} style={{ marginTop: '0.2rem' }} />
               I have permission to record and process this session, and (if applicable) other participants were informed.
             </label>
-            {uploadError && <p style={{ color: '#ef4444', fontSize: '0.85rem' }}>{uploadError}</p>}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button className="btn btn-outline" onClick={() => setShowUploadModal(false)} disabled={uploading}>
                 Cancel

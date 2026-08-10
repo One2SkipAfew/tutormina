@@ -15,6 +15,7 @@ import {
   type MyTutor,
 } from '../../lib/learningZone';
 import { uploadStudentDocument } from '../../lib/studentDetails';
+import { useModal } from '../../contexts/NotificationContext';
 import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send, Mic } from 'lucide-react';
 
 const EVENT_TYPE_LABELS: Record<LearningEvent['event_type'], string> = {
@@ -44,7 +45,7 @@ export default function LearningZone() {
   const [recordings, setRecordings] = useState<SessionRecording[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const [eventType, setEventType] = useState<LearningEvent['event_type']>('benchmark');
   const [title, setTitle] = useState('');
@@ -61,7 +62,6 @@ export default function LearningZone() {
   const [submissionTitle, setSubmissionTitle] = useState('');
   const [submissionFile, setSubmissionFile] = useState<File | null>(null);
   const [submittingWork, setSubmittingWork] = useState(false);
-  const [submissionSuccess, setSubmissionSuccess] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,7 +77,7 @@ export default function LearningZone() {
       setStreak(s);
       setRecordings(rec);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load learning zone');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load learning zone', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export default function LearningZone() {
       setDescription('');
       setEventDate('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add');
+      showModal({ type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Failed to add', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -118,7 +118,7 @@ export default function LearningZone() {
       const newStreak = await getLearningStreak();
       setStreak(newStreak);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to log result');
+      showModal({ type: 'error', title: 'Save Failed', message: err instanceof Error ? err.message : 'Failed to log result', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploadingResult(false);
     }
@@ -127,14 +127,13 @@ export default function LearningZone() {
   const handleSubmitWork = async () => {
     if (!selectedTutor || !submissionFile || !submissionTitle.trim()) return;
     setSubmittingWork(true);
-    setSubmissionSuccess(false);
     try {
       await submitFileToProvider(submissionFile, selectedTutor, submissionTitle.trim());
-      setSubmissionSuccess(true);
+      showModal({ type: 'success', title: 'Submitted', message: 'Work submitted successfully.', buttons: [{ label: 'Done', variant: 'primary', onClick: 'dismiss' }] });
       setSubmissionTitle('');
       setSubmissionFile(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      showModal({ type: 'error', title: 'Submission Failed', message: err instanceof Error ? err.message : 'Failed to submit', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setSubmittingWork(false);
     }
@@ -162,7 +161,7 @@ export default function LearningZone() {
         <p className="dashboard-page-subtitle">Plan your year, track results, and submit work to your tutors and coaches.</p>
       </div>
 
-      {error && <div style={{ background: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>{error}</div>}
+
 
       <div className="stats-grid">
         <div className="stat-card">
@@ -339,7 +338,7 @@ export default function LearningZone() {
               <button className="btn btn-primary" style={{ background: zoneColor, borderColor: zoneColor }} onClick={handleSubmitWork} disabled={!selectedTutor || !submissionFile || !submissionTitle.trim() || submittingWork}>
                 {submittingWork ? 'Submitting...' : 'Submit'}
               </button>
-              {submissionSuccess && <p style={{ color: '#137333', fontSize: '0.85rem', marginTop: '0.5rem' }}>✅ Submitted successfully.</p>}
+
             </div>
           )}
         </div>

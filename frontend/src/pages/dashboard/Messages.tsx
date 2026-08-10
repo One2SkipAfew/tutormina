@@ -12,6 +12,7 @@ import {
   getMessageableContacts,
   getOrCreateConversation,
 } from '../../lib/messaging';
+import { useModal, useToast } from '../../contexts/NotificationContext';
 import '../../styles/messaging.css';
 
 export default function Messages() {
@@ -28,7 +29,8 @@ export default function Messages() {
   });
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
+  const { showToast } = useToast();
 
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [contacts, setContacts] = useState<Profile[]>([]);
@@ -43,7 +45,15 @@ export default function Messages() {
       const data = await getConversations();
       setConversations(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load conversations');
+      showModal({ 
+        type: 'error', 
+        title: 'Load Failed', 
+        message: err instanceof Error ? err.message : 'Failed to load conversations', 
+        buttons: [
+          { label: 'Retry', variant: 'outline', onClick: () => loadConversations() },
+          { label: 'Go to Dashboard', variant: 'primary', onClick: () => { window.location.href = '/dashboard'; } }
+        ] 
+      });
     } finally {
       setLoadingConversations(false);
     }
@@ -63,7 +73,11 @@ export default function Messages() {
     setLoadingMessages(true);
     getMessages(activeConversationId)
       .then((data) => { if (!cancelled) setMessages(data); })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load messages'))
+      .catch((err) => {
+        if (!cancelled) {
+          showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load messages', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
+        }
+      })
       .finally(() => { if (!cancelled) setLoadingMessages(false); });
 
     channelRef.current?.unsubscribe();
@@ -98,7 +112,7 @@ export default function Messages() {
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
       loadConversations();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      showToast('error', err instanceof Error ? err.message : 'Failed to send message');
       setDraft(body);
     }
   };
@@ -110,7 +124,7 @@ export default function Messages() {
       const data = await getMessageableContacts();
       setContacts(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load contacts');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load contacts', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setLoadingContacts(false);
     }
@@ -123,7 +137,7 @@ export default function Messages() {
       await loadConversations();
       openConversation(conversation.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start conversation');
+      showModal({ type: 'error', title: 'Action Failed', message: err instanceof Error ? err.message : 'Failed to start conversation', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -231,7 +245,7 @@ export default function Messages() {
         </div>
       )}
 
-      {error && <div className="messages-error-toast" onClick={() => setError(null)}>{error}</div>}
+
     </div>
   );
 }

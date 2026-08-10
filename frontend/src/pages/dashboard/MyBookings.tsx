@@ -7,6 +7,7 @@ import { getRoleDisplayName } from '../../types/lms';
 import type { Profile, ProviderDetails } from '../../types/lms';
 import BookingCalendarModal from '../../components/directory/BookingCalendarModal';
 import { Calendar, Video, Link, MessageCircle, Edit2 } from 'lucide-react';
+import { useModal } from '../../contexts/NotificationContext';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   pending: { bg: '#fef7e0', color: '#b06000' },
@@ -20,7 +21,7 @@ export default function MyBookings() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<BookingWithProvider[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const [editingProvider, setEditingProvider] = useState<(Profile & { provider_details?: ProviderDetails }) | null>(null);
   const [editingBooking, setEditingBooking] = useState<BookingWithProvider | null>(null);
@@ -36,7 +37,15 @@ export default function MyBookings() {
     try {
       setBookings(await getMyBookingsAsCustomer());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load bookings');
+      showModal({ 
+        type: 'error', 
+        title: 'Load Failed', 
+        message: err instanceof Error ? err.message : 'Failed to load bookings', 
+        buttons: [
+          { label: 'Retry', variant: 'outline', onClick: () => load() },
+          { label: 'Go to Dashboard', variant: 'primary', onClick: () => navigate('/dashboard') }
+        ] 
+      });
     } finally {
       setLoading(false);
     }
@@ -227,7 +236,7 @@ export default function MyBookings() {
         </button>
       </div>
 
-      {error && <div style={{ background: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>{error}</div>}
+
 
       {loading ? (
         <p>Loading...</p>

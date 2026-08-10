@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -85,6 +86,7 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
+      <NotificationProvider>
       <Router>
         <Routes>
           {/* Public Pages */}
@@ -170,6 +172,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

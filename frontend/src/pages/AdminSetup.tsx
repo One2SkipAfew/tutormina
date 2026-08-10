@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { Eye, EyeOff } from 'lucide-react';
+import { useModal } from '../contexts/NotificationContext';
 
 export default function AdminSetup() {
   const [showPassword, setShowPassword] = useState(false);
@@ -10,14 +11,13 @@ export default function AdminSetup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -26,7 +26,7 @@ export default function AdminSetup() {
     });
 
     if (authError) {
-      setError(authError.message);
+      showModal({ type: 'error', title: 'Setup Failed', message: authError.message, buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
       setLoading(false);
       return;
     }
@@ -57,11 +57,7 @@ export default function AdminSetup() {
           One-time setup. This form disables itself once an admin account exists.
         </p>
 
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
+
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem' }}>

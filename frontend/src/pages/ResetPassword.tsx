@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Eye, EyeOff } from 'lucide-react';
+import { useModal } from '../contexts/NotificationContext';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,17 +26,20 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     const { error } = await supabase.auth.updateUser({
       password: password
     });
 
     if (error) {
-      setError(error.message);
+      showModal({ type: 'error', title: 'Update Failed', message: error.message, buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } else {
-      // Success! The user is now logged in with the new password.
-      navigate('/dashboard');
+      showModal({ 
+        type: 'success', 
+        title: 'Password Updated', 
+        message: 'Your password has been successfully reset. You are now logged in.', 
+        buttons: [{ label: 'Go to Dashboard', variant: 'primary', onClick: () => navigate('/dashboard') }]
+      });
     }
     setLoading(false);
   };
@@ -47,11 +51,7 @@ export default function ResetPassword() {
           Set New Password
         </h2>
 
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
+
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>

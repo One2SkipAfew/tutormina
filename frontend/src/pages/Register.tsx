@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Eye, EyeOff } from 'lucide-react';
+import { useModal } from '../contexts/NotificationContext';
 
 type Role = 'customer' | 'tutor' | 'coach';
 type UserType = 'student' | 'professional' | null;
@@ -15,8 +16,8 @@ export default function Register() {
   const [role, setRole] = useState<Role>('customer');
   const [userType, setUserType] = useState<UserType>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { showModal } = useModal();
 
   const handleUserTypeSelect = (type: UserType) => {
     setUserType(type);
@@ -34,7 +35,6 @@ export default function Register() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -49,7 +49,7 @@ export default function Register() {
     });
 
     if (authError) {
-      setError(authError.message);
+      showModal({ type: 'error', title: 'Registration Failed', message: authError.message, buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
       setLoading(false);
       return;
     }
@@ -63,7 +63,6 @@ export default function Register() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -72,7 +71,7 @@ export default function Register() {
       },
     });
     if (error) {
-      setError(error.message);
+      showModal({ type: 'error', title: 'Google Sign Up Failed', message: error.message });
       setLoading(false);
     }
   };
@@ -135,11 +134,7 @@ export default function Register() {
           Join TutorMina
         </h2>
         
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
+
 
         {success ? (
           <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>

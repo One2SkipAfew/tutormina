@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor } from '../../types/lms';
 import { getMyStudents, type MyStudent } from '../../lib/students';
+import { useModal } from '../../contexts/NotificationContext';
 
 export default function MyStudents() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function MyStudents() {
   const [students, setStudents] = useState<MyStudent[]>([]);
   const [sessionsThisMonth, setSessionsThisMonth] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   const zoneColor = zone === 'tutor' ? 'var(--zone-tutor)' : zone === 'coach' ? 'var(--zone-coach)' : 'var(--zone-student)';
 
@@ -25,7 +26,7 @@ export default function MyStudents() {
       setStudents(result.students);
       setSessionsThisMonth(result.sessionsThisMonth);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load students');
+      showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load students', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ export default function MyStudents() {
         </p>
       </div>
 
-      {error && <div style={{ background: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>{error}</div>}
+
 
       {/* Stats */}
       <div className="stats-grid">

@@ -5,6 +5,7 @@ import { getFiles, uploadFile, deleteFile as deleteSharedFile } from '../../lib/
 import { getZoneColor, getFileTypeIcon, formatFileSize, getAllowedExtensionsForType } from '../../types/lms';
 import type { Folder, SharedFile, FileType, FileVisibility } from '../../types/lms';
 import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic } from 'lucide-react';
+import { useModal } from '../../contexts/NotificationContext';
 import '../../styles/shared-drive.css';
 
 const FILE_TYPE_FILTERS: { value: FileType | ''; label: string; icon: React.ReactNode }[] = [
@@ -46,7 +47,7 @@ export default function ResourceManager() {
   const [uploadType, setUploadType] = useState<FileType>('document');
   const [uploadVisibility, setUploadVisibility] = useState<FileVisibility>('public');
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { showModal } = useModal();
 
   // Edit folder
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
@@ -129,7 +130,6 @@ export default function ResourceManager() {
   const handleUpload = async () => {
     if (!uploadFile_ || !uploadTitle.trim()) return;
     setUploading(true);
-    setUploadError(null);
     try {
       await uploadFile(uploadFile_, {
         title: uploadTitle.trim(),
@@ -146,7 +146,7 @@ export default function ResourceManager() {
       setUploadVisibility('public');
       loadData();
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+      showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Upload failed', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploading(false);
     }
@@ -447,11 +447,7 @@ export default function ResourceManager() {
               <button className="upload-modal-close" onClick={() => setShowUpload(false)}>×</button>
             </div>
             <div className="upload-modal-body">
-              {uploadError && (
-                <div className="upload-size-warning" style={{ background: '#FFEBEE', borderColor: '#EF9A9A', color: '#C62828' }}>
-                  ⚠️ {uploadError}
-                </div>
-              )}
+
 
               {/* Dropzone */}
               <label className={`upload-dropzone ${uploadFile_ ? '' : ''}`}>

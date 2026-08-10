@@ -2,19 +2,19 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Eye, EyeOff } from 'lucide-react';
+import { useModal } from '../contexts/NotificationContext';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { showModal } = useModal();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -22,7 +22,15 @@ export default function Login() {
     });
 
     if (error) {
-      setError(error.message);
+      showModal({
+        type: 'error',
+        title: 'Login Failed',
+        message: error.message === 'Invalid login credentials' ? 'The email or password you entered is incorrect. Please try again.' : error.message,
+        buttons: [
+          { label: 'Try Again', variant: 'outline', onClick: 'dismiss' },
+          { label: 'Forgot Password?', variant: 'primary', onClick: () => navigate('/forgot-password') },
+        ],
+      });
     } else {
       navigate('/dashboard');
     }
@@ -31,7 +39,6 @@ export default function Login() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setError(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -39,10 +46,9 @@ export default function Login() {
       },
     });
     if (error) {
-      setError(error.message);
+      showModal({ type: 'error', title: 'Google Login Failed', message: error.message });
       setLoading(false);
     }
-    // No need to set loading false on success, it redirects.
   };
 
   return (
@@ -52,11 +58,7 @@ export default function Login() {
           Welcome Back to TutorMina
         </h2>
         
-        {error && (
-          <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
+
 
         <button
           onClick={handleGoogleLogin}
