@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function AdminSetup() {
-  const [checking, setChecking] = useState(true);
-  const [alreadySetUp, setAlreadySetUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -13,12 +13,7 @@ export default function AdminSetup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    supabase.rpc('admin_exists').then(({ data, error }) => {
-      if (!error) setAlreadySetUp(!!data);
-      setChecking(false);
-    });
-  }, []);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,23 +46,7 @@ export default function AdminSetup() {
     setLoading(false);
   };
 
-  if (checking) {
-    return <div className="container" style={{ paddingTop: '4rem', textAlign: 'center' }}>Checking...</div>;
-  }
 
-  if (alreadySetUp) {
-    return (
-      <div className="container animate-fade-in" style={{ paddingTop: '4rem', maxWidth: '500px' }}>
-        <div className="glass-card" style={{ textAlign: 'center' }}>
-          <h2 style={{ color: 'var(--color-olive-dark)' }}>Setup already complete</h2>
-          <p style={{ color: 'var(--color-text-muted)', margin: '1rem 0 1.5rem' }}>
-            An admin account already exists for TutorMina.
-          </p>
-          <Link to="/admin-login" className="btn btn-primary" style={{ textDecoration: 'none' }}>Go to Admin Login</Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container animate-fade-in" style={{ paddingTop: '4rem', maxWidth: '500px' }}>
@@ -107,8 +86,17 @@ export default function AdminSetup() {
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
-              style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-warm)', fontFamily: 'inherit' }} />
+            <div style={{ position: 'relative' }}>
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
+                style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-warm)', fontFamily: 'inherit' }} />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '1rem' }}>

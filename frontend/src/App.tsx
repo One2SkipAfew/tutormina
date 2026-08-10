@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import DashboardHome from './pages/dashboard/DashboardHome';
@@ -91,6 +93,8 @@ function App() {
           <Route path="/directory/:id" element={<PublicLayout><DirectoryProfile /></PublicLayout>} />
           <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
           <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
+          <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
+          <Route path="/reset-password" element={<PublicLayout><ResetPassword /></PublicLayout>} />
 
           {/* Hidden admin routes - not linked anywhere in public nav */}
           <Route path="/admin-setup" element={<PublicLayout><AdminSetup /></PublicLayout>} />
