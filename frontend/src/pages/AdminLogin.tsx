@@ -62,6 +62,8 @@ export default function AdminLogin() {
               style={{ width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-gray-warm)', fontFamily: 'inherit' }}
             />
           </div>
+          <div>
+            <label htmlFor="admin-password" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Password</label>
             <div style={{ position: 'relative' }}>
               <input
                 id="admin-password"
