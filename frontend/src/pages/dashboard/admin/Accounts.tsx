@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Profile, UserRole, UserStatus } from '../../../types/lms';
 import { getRoleDisplayName } from '../../../types/lms';
-import { getAllAccounts, updateAccountStatus } from '../../../lib/admin';
+import { getAllAccounts, updateAccountStatus, promoteToAdmin } from '../../../lib/admin';
 import '../../../styles/admin.css';
 import '../../../styles/messaging.css';
 
@@ -16,7 +16,7 @@ export default function Accounts() {
   const [statusFilter, setStatusFilter] = useState<UserStatus | ''>('');
   const [search, setSearch] = useState('');
 
-  const [actionTarget, setActionTarget] = useState<{ profile: Profile; action: 'suspended' | 'blocked' | 'deleted' | 'approved' } | null>(null);
+  const [actionTarget, setActionTarget] = useState<{ profile: Profile; action: 'suspended' | 'blocked' | 'deleted' | 'approved' | 'make_admin' } | null>(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,7 +37,7 @@ export default function Accounts() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openAction = (profile: Profile, action: 'suspended' | 'blocked' | 'deleted' | 'approved') => {
+  const openAction = (profile: Profile, action: 'suspended' | 'blocked' | 'deleted' | 'approved' | 'make_admin') => {
     setActionTarget({ profile, action });
     setReason('');
   };
@@ -47,7 +47,11 @@ export default function Accounts() {
     setSubmitting(true);
     setError(null);
     try {
-      await updateAccountStatus(actionTarget.profile.id, actionTarget.action, reason.trim() || undefined);
+      if (actionTarget.action === 'make_admin') {
+        await promoteToAdmin(actionTarget.profile.id);
+      } else {
+        await updateAccountStatus(actionTarget.profile.id, actionTarget.action, reason.trim() || undefined);
+      }
       setActionTarget(null);
       await load();
     } catch (err) {
@@ -62,6 +66,7 @@ export default function Accounts() {
     blocked: 'Block',
     deleted: 'Deactivate',
     approved: 'Reactivate',
+    make_admin: 'Make Admin',
   };
 
   return (
@@ -106,6 +111,7 @@ export default function Accounts() {
                 <td>{getRoleDisplayName(a.role)}</td>
                 <td><span className={`admin-status-badge admin-status-${a.status}`}>{a.status}</span></td>
                 <td className="admin-table-actions">
+                  {a.role !== 'admin' && <button className="btn btn-outline btn-sm" onClick={() => openAction(a, 'make_admin')}>Make Admin</button>}
                   {a.status !== 'suspended' && <button className="btn btn-outline btn-sm" onClick={() => openAction(a, 'suspended')}>Suspend</button>}
                   {a.status !== 'blocked' && <button className="btn btn-outline btn-sm" onClick={() => openAction(a, 'blocked')}>Block</button>}
                   {a.status !== 'approved' && <button className="btn btn-outline btn-sm" onClick={() => openAction(a, 'approved')}>Reactivate</button>}
@@ -121,11 +127,17 @@ export default function Accounts() {
         <div className="modal-overlay" onClick={() => setActionTarget(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>{actionLabel[actionTarget.action]} {actionTarget.profile.first_name} {actionTarget.profile.last_name}?</h3>
-            <label>Reason {actionTarget.action !== 'approved' && '(shared with the account holder)'}</label>
-            <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+            {actionTarget.action === 'make_admin' ? (
+              <p>This grants full admin access, including managing accounts, applications, and platform settings.</p>
+            ) : (
+              <>
+                <label>Reason {actionTarget.action !== 'approved' && '(shared with the account holder)'}</label>
+                <textarea rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+              </>
+            )}
             <div className="admin-detail-actions">
               <button className="btn btn-outline" onClick={() => setActionTarget(null)} disabled={submitting}>Cancel</button>
-              <button className="btn admin-btn-decline" onClick={confirmAction} disabled={submitting}>
+              <button className={`btn ${actionTarget.action === 'make_admin' ? '' : 'admin-btn-decline'}`} onClick={confirmAction} disabled={submitting}>
                 {submitting ? 'Working...' : `Confirm ${actionLabel[actionTarget.action]}`}
               </button>
             </div>

@@ -333,7 +333,7 @@ export default function SharedDrive() {
             <div className="upload-modal-footer">
               {selectedFile.file_url && (
                 <a
-                  href={selectedFile.file_url}
+                  href={selectedFile.file_url + (selectedFile.file_url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(selectedFile.title)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-primary"

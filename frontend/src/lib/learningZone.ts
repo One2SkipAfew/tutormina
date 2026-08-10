@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { LearningEvent } from '../types/lms';
+import type { LearningEvent, SessionRecording } from '../types/lms';
 import { getMyBookingsAsCustomer } from './bookings';
 import { uploadFile } from './sharedDrive';
 
@@ -84,6 +84,24 @@ export async function submitFileToProvider(file: File, providerId: string, title
     visibility: 'private',
     sharedWithId: providerId,
   });
+}
+
+// Recently processed session recordings (uploaded or Chommie-captured) to surface as
+// session notes in the Learning Zone.
+export async function getMyRecentRecordings(limit = 5): Promise<SessionRecording[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('session_recordings')
+    .select('*')
+    .eq('owner_id', user.id)
+    .eq('status', 'ready')
+    .order('completed_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as SessionRecording[];
 }
 
 function getWeekStart(date: Date): Date {

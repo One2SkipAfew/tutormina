@@ -18,6 +18,14 @@ const getAiApiBaseUrl = (): string => {
 
 export const AI_API_BASE = getAiApiBaseUrl();
 
+if (!AI_API_BASE && typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+  console.warn(
+    '[TutorMina] VITE_AI_API_URL is not set and we are NOT on localhost. ' +
+    'AI API calls will target the same origin, which will 404 on Netlify. ' +
+    'Set VITE_AI_API_URL to your HuggingFace Spaces URL in the Netlify env vars.'
+  );
+}
+
 /** Derive WebSocket URL from the API base. */
 export const getWsUrl = (path: string = '/ws/livestream'): string => {
   const base = AI_API_BASE || window.location.origin;
@@ -117,7 +125,7 @@ async function aiApiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ---- API Functions ----
 
-/** Summarise text using Gemini. */
+/** Summarise text using Groq. */
 export async function summariseText(text: string): Promise<SummaryResponse> {
   return aiApiFetch<SummaryResponse>('/summarise-text', {
     method: 'POST',
@@ -164,7 +172,7 @@ export async function parsePdf(file: File): Promise<ParsedPdf> {
   });
 }
 
-/** Scan an image and extract text via Gemini vision. */
+/** Scan an image and extract text via Groq vision. */
 export async function extractImageText(file: File): Promise<ExtractedImage> {
   const formData = new FormData();
   formData.append('file', file);

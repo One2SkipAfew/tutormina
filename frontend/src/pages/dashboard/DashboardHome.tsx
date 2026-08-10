@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import type { UserRole, Notification } from '../../types/lms';
+import type { UserRole } from '../../types/lms';
 import { getAdminDashboardStats, getRecentAdminActivity, type AdminActivityItem } from '../../lib/admin';
-import { getNotifications } from '../../lib/messaging';
+
 import { getMyStudents } from '../../lib/students';
 import { getMyBookingsAsCustomer } from '../../lib/bookings';
 import { getLearningStreak } from '../../lib/learningZone';
@@ -173,9 +173,6 @@ async function getAggregatedActivity(userId: string, role: UserRole): Promise<Ac
   });
 
   conversations?.forEach(c => {
-    const p1 = Array.isArray(c.participant_one) ? c.participant_one[0] : c.participant_one;
-    const p2 = Array.isArray(c.participant_two) ? c.participant_two[0] : c.participant_two;
-    // Guessing who the other is:
     items.push({
       id: `msg-${c.id}`,
       type: 'message',

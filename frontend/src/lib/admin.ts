@@ -167,6 +167,23 @@ export async function updateAccountStatus(
   await sendStatusEmail(updated, status, reason, status === 'approved');
 }
 
+export async function promoteToAdmin(profileId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      role: 'admin',
+      status: 'approved',
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', profileId);
+
+  if (error) throw error;
+}
+
 // ============ DASHBOARD OVERVIEW ============
 
 export interface AdminDashboardStats {

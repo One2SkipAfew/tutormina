@@ -76,6 +76,13 @@ const Icons = {
       <path d="M19 14l.9 2.7L22.6 17.6l-2.7.9L19 21.2l-.9-2.7-2.7-.9 2.7-.9L19 14z" />
     </svg>
   ),
+  Film: () => (
+    <svg className="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="18" rx="2" ry="2" />
+      <line x1="7" y1="3" x2="7" y2="21" /><line x1="17" y1="3" x2="17" y2="21" />
+      <line x1="2" y1="9" x2="22" y2="9" /><line x1="2" y1="15" x2="22" y2="15" />
+    </svg>
+  ),
   MessageCircle: () => (
     <svg className="sidebar-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
@@ -132,6 +139,7 @@ function DashboardLayoutInner() {
         { to: '/dashboard/students', label: 'My Students', icon: Icons.Users },
         { to: '/dashboard/calendar', label: 'My Calendar', icon: Icons.Calendar },
         { to: '/dashboard/live-session', label: 'Live Session', icon: Icons.Radio },
+        { to: '/dashboard/session-recordings', label: 'Session Recordings', icon: Icons.Film },
         { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
       ];
     }
@@ -141,6 +149,7 @@ function DashboardLayoutInner() {
       ...common,
       { to: '/dashboard/bookings', label: 'My Bookings', icon: Icons.Calendar },
       { to: '/dashboard/live-session', label: 'Live Session', icon: Icons.Radio },
+      { to: '/dashboard/session-recordings', label: 'Session Recordings', icon: Icons.Film },
       { to: '/dashboard/learning-zone', label: 'Learning Zone', icon: Icons.BarChart },
       { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
     ];

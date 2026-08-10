@@ -83,12 +83,12 @@ export async function deleteFolder(folderId: string): Promise<void> {
 
 export function validateFile(file: File, fileType: FileType): string | null {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-  const isVideo = fileType === 'video';
-  const maxSize = isVideo ? FILE_LIMITS.MAX_VIDEO_SIZE_MB : FILE_LIMITS.MAX_FILE_SIZE_MB;
+  const isLargeMedia = fileType === 'video' || fileType === 'recording';
+  const maxSize = isLargeMedia ? FILE_LIMITS.MAX_VIDEO_SIZE_MB : FILE_LIMITS.MAX_FILE_SIZE_MB;
   const fileSizeMB = file.size / (1024 * 1024);
 
   if (fileSizeMB > maxSize) {
-    return `File is too large (${fileSizeMB.toFixed(1)} MB). Maximum is ${maxSize} MB${isVideo ? ' for videos' : ''}.`;
+    return `File is too large (${fileSizeMB.toFixed(1)} MB). Maximum is ${maxSize} MB${isLargeMedia ? ' for media' : ''}.`;
   }
 
   const allAllowed = getAllowedExtensionsForType(fileType);
@@ -129,6 +129,7 @@ export async function uploadFile(
     .upload(storagePath, file, {
       cacheControl: '3600',
       upsert: false,
+      contentType: file.type || undefined,
     });
 
   if (uploadError) throw uploadError;

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor } from '../../types/lms';
-import type { LearningEvent } from '../../types/lms';
+import type { LearningEvent, SessionRecording } from '../../types/lms';
 import {
   getMyLearningEvents,
   addLearningEvent,
@@ -10,10 +11,11 @@ import {
   getMyTutors,
   submitFileToProvider,
   getLearningStreak,
+  getMyRecentRecordings,
   type MyTutor,
 } from '../../lib/learningZone';
 import { uploadStudentDocument } from '../../lib/studentDetails';
-import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send } from 'lucide-react';
+import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send, Mic } from 'lucide-react';
 
 const EVENT_TYPE_LABELS: Record<LearningEvent['event_type'], string> = {
   benchmark: 'Benchmark',
@@ -39,6 +41,7 @@ export default function LearningZone() {
   const zoneColor = 'var(--zone-student)';
 
   const [events, setEvents] = useState<LearningEvent[]>([]);
+  const [recordings, setRecordings] = useState<SessionRecording[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,10 +66,16 @@ export default function LearningZone() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [ev, tut, s] = await Promise.all([getMyLearningEvents(), getMyTutors(), getLearningStreak()]);
+      const [ev, tut, s, rec] = await Promise.all([
+        getMyLearningEvents(),
+        getMyTutors(),
+        getLearningStreak(),
+        getMyRecentRecordings(),
+      ]);
       setEvents(ev);
       setTutors(tut);
       setStreak(s);
+      setRecordings(rec);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load learning zone');
     } finally {
@@ -266,7 +275,34 @@ export default function LearningZone() {
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.15rem' }}>
                   {ev.result_text && <strong>{ev.result_text}</strong>}
-                  {ev.result_file_url && <> &middot; <a href={ev.result_file_url} target="_blank" rel="noopener noreferrer">View file</a></>}
+                  {ev.result_file_url && <> &middot; <a href={ev.result_file_url + (ev.result_file_url.includes('?') ? '&' : '?') + 'download=ResultFile'} target="_blank" rel="noopener noreferrer">View file</a></>}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Session Notes (from uploaded recordings / Chommie captures) */}
+      <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
+        <div className="content-panel-header" style={{ display: 'block' }}>
+          <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Mic size={20} /> Session Notes</h3>
+          <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Transcripts and fact-checks from recorded or uploaded sessions.</p>
+        </div>
+        <div className="content-panel-body">
+          {recordings.length === 0 ? (
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+              No session notes yet. Upload a recording or use the Chommie extension on your next call — see{' '}
+              <Link to="/dashboard/session-recordings">Session Recordings</Link>.
+            </p>
+          ) : (
+            recordings.map((rec) => (
+              <div key={rec.id} style={{ padding: '0.7rem 0', borderBottom: '1px solid #f2f4f6' }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{rec.title || 'Untitled recording'}</div>
+                <div style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.15rem' }}>
+                  {rec.completed_at ? new Date(rec.completed_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : ''}
+                  {' • '}
+                  <Link to="/dashboard/session-recordings">View notes</Link>
                 </div>
               </div>
             ))

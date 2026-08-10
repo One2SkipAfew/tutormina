@@ -192,6 +192,42 @@ export interface Booking {
   created_at: string;
 }
 
+export type SessionRecordingCaptureMethod = 'upload' | 'extension_capture';
+export type SessionRecordingPlatform = 'google_meet' | 'microsoft_teams' | 'zoom' | 'other';
+export type SessionRecordingStatus = 'pending' | 'processing' | 'ready' | 'failed';
+
+export interface SessionRecording {
+  id: string;
+  booking_id: string | null;
+  owner_id: string;
+  title: string | null;
+  capture_method: SessionRecordingCaptureMethod;
+  platform: SessionRecordingPlatform | null;
+  video_path: string | null;
+  audio_path: string | null;
+  consent_confirmed: boolean;
+  status: SessionRecordingStatus;
+  transcript_text: string | null;
+  duration_seconds: number | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface SessionRecordingClaim {
+  id: string;
+  session_recording_id: string;
+  claim_text: string;
+  speaker: string | null;
+  category: string | null;
+  verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'UNVERIFIABLE';
+  confidence_score: number;
+  explanation: string | null;
+  key_evidence: string | null;
+  source_urls: string[] | null;
+  used_web_search: boolean;
+  created_at: string;
+}
+
 export type VideoRoomStatus = 'waiting' | 'active' | 'ended';
 
 export interface VideoRoom {
@@ -362,6 +398,7 @@ export function getRoleDisplayName(role: UserRole): string {
   }
 }
 
+
 export function getFileTypeIcon(fileType: FileType): string {
   switch (fileType) {
     case 'document': return '📄';
@@ -422,7 +459,7 @@ export function getAllowedExtensionsForType(type: FileType | string): readonly s
     case 'past_paper': return FILE_LIMITS.ALLOWED_PAST_PAPER_TYPES;
     case 'notes': return FILE_LIMITS.ALLOWED_NOTES_TYPES;
     case 'course_material': return FILE_LIMITS.ALLOWED_COURSE_MATERIAL_TYPES;
-    case 'recording': return FILE_LIMITS.ALLOWED_AUDIO_TYPES;
+    case 'recording': return [...FILE_LIMITS.ALLOWED_VIDEO_TYPES, ...FILE_LIMITS.ALLOWED_AUDIO_TYPES];
     default: return [
       ...FILE_LIMITS.ALLOWED_DOCUMENT_TYPES,
       ...FILE_LIMITS.ALLOWED_VIDEO_TYPES,

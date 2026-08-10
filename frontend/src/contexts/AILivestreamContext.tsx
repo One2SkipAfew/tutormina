@@ -120,6 +120,7 @@ export function AILivestreamProvider({ children }: { children: ReactNode }) {
 
   const resetSession = useCallback(() => {
     transcript.reset();
+    factChecker.clearResults();
     setAiNotes('');
     setSessionSummary('');
     setShowSummaryModal(false);

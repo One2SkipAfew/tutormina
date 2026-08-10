@@ -470,7 +470,7 @@ export default function ResourceManager() {
                 </div>
                 <div className="upload-dropzone-hint">
                   {uploadType === 'video' ? 'Max 500 MB • Video files only' : 
-                   uploadType === 'recording' ? 'Max 100 MB • Audio files only' : 
+                   uploadType === 'recording' ? 'Max 500 MB • Media files only' : 
                    `Max 100 MB • ${getAllowedExtensionsForType(uploadType).slice(0, 5).join(', ').toUpperCase()}...`}
                 </div>
               </label>

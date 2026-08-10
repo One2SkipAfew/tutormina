@@ -1,0 +1,30 @@
+# ============================================
+# TutorMina Frontend — Netlify Build Config
+# ============================================
+
+[build]
+  # The frontend lives in a subdirectory of the monorepo
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — serves index.html for all routes so React Router works.
+# This is a backup for the public/_redirects file.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ============================================
+# Required Environment Variables (set in Netlify UI → Site settings → Environment variables):
+#
+#   VITE_SUPABASE_URL          = https://<project-ref>.supabase.co
+#   VITE_SUPABASE_ANON_KEY     = <your supabase anon/public key>
+#   VITE_AI_API_URL            = https://<username>-tutormina-ai.hf.space
+#   VITE_PAYSTACK_PUBLIC_KEY   = pk_live_<your key>
+#
+# Do NOT set VITE_DAILY_API_KEY — it's a secret and should not be in the client bundle.
+# ============================================
