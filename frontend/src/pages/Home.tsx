@@ -1,5 +1,6 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { GraduationCap, Briefcase } from 'lucide-react';
 
 export default function Home() {
   const { session } = useAuth();
@@ -42,8 +43,8 @@ export default function Home() {
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
             <div className="glass-card" style={{ background: 'var(--color-background)' }}>
-              <h3 style={{ color: 'var(--color-olive-dark)', fontSize: '1.5rem', borderBottom: '2px solid var(--color-spring-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-                🎒 Expert Tutoring
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--color-olive-dark)', fontSize: '1.5rem', borderBottom: '2px solid var(--color-spring-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                <GraduationCap size={28} /> Expert Tutoring
               </h3>
               <p style={{ marginBottom: '1rem' }}><strong>Super Revision:</strong> High-impact summaries & past paper walk-throughs!</p>
               <p style={{ marginBottom: '1rem' }}><strong>All Graders:</strong> Tailored assistance spanning Grades 0 to 12 & Varsity level!</p>
@@ -52,8 +53,8 @@ export default function Home() {
             </div>
 
             <div className="glass-card" style={{ background: 'var(--color-background)' }}>
-              <h3 style={{ color: 'var(--color-beige-dark)', fontSize: '1.5rem', borderBottom: '2px solid var(--color-tan-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-                🤝 Professional Coaching
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--color-beige-dark)', fontSize: '1.5rem', borderBottom: '2px solid var(--color-tan-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                <Briefcase size={28} /> Professional Coaching
               </h3>
               <p style={{ marginBottom: '1rem' }}><strong>Behavioural Coaches:</strong> Holistic, experienced life coaches dedicated to personal growth and overcoming career challenges. Career coaching and career guidance. Identifying and highlighting skillsets, bringing them to the fore and advising appropriately.</p>
               <p><strong>Executive Coaches:</strong> Previous executives coaching prospective employees on the best techniques and methods to land executive positions, including careers in MBB management consulting companies.</p>

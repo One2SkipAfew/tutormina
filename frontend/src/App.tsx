@@ -6,6 +6,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import Contact from './pages/Contact';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import DashboardLayout from './components/layouts/DashboardLayout';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import DashboardHome from './pages/dashboard/DashboardHome';
@@ -73,10 +76,17 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
     <div className="page-wrapper">
       <PublicNav />
       <main>{children}</main>
-      <footer className="site-footer">
-        <div className="container">
-          <p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>TutorMina</p>
-          <p style={{ fontSize: '0.9rem', color: '#e0e0e0' }}>&copy; {new Date().getFullYear()} From B2C. All rights reserved.</p>
+      <footer className="site-footer" style={{ padding: '2rem 0', background: 'var(--color-olive-dark)', color: '#e0e0e0' }}>
+        <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <p style={{ fontWeight: 600, fontSize: '1.2rem', color: '#fff', margin: 0 }}>TutorMina</p>
+          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
+            <a href="/terms" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Terms &amp; Conditions</a>
+            <a href="/privacy" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href="/contact" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Contact Us</a>
+          </div>
+          <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.8 }}>
+            &copy; {new Date().getFullYear()} <a href="https://fromb2c.africa" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>From B 2 C</a>. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
@@ -97,6 +107,9 @@ function App() {
           <Route path="/register" element={<PublicLayout><Register /></PublicLayout>} />
           <Route path="/forgot-password" element={<PublicLayout><ForgotPassword /></PublicLayout>} />
           <Route path="/reset-password" element={<PublicLayout><ResetPassword /></PublicLayout>} />
+          <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+          <Route path="/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+          <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
 
           {/* Hidden admin routes - not linked anywhere in public nav */}
           <Route path="/admin-setup" element={<PublicLayout><AdminSetup /></PublicLayout>} />
