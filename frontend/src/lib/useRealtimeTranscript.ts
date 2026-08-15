@@ -22,6 +22,10 @@ export interface TranscriptEntry {
   isFinal: boolean;
 }
 
+export interface StartOptions {
+  captureTabAudio?: boolean;
+}
+
 interface UseRealtimeTranscriptReturn {
   /** All finalised transcript entries. */
   transcriptEntries: TranscriptEntry[];
@@ -40,7 +44,7 @@ interface UseRealtimeTranscriptReturn {
   /** Which transcription method is in use. */
   method: 'deepgram' | 'webspeech' | 'none';
   /** Start recording. */
-  start: () => Promise<void>;
+  start: (options?: StartOptions) => Promise<void>;
   /** Stop recording and close connections. */
   stop: () => void;
   /** Toggle pause/resume. */
@@ -122,12 +126,41 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
     return () => { stop(); };
   }, [stop]);
 
-  const startDeepgram = useCallback(async (): Promise<boolean> => {
+  const startDeepgram = useCallback(async (options?: StartOptions): Promise<boolean> => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const micStream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true },
       });
-      mediaStreamRef.current = stream;
+      
+      let mixedStream = micStream;
+
+      if (options?.captureTabAudio) {
+        try {
+          const displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+          });
+          displayStream.getVideoTracks().forEach(track => track.stop());
+          
+          if (displayStream.getAudioTracks().length > 0) {
+            const ac = new AudioContext({ sampleRate: 16000 });
+            audioContextRef.current = ac;
+            
+            const micSource = ac.createMediaStreamSource(micStream);
+            const displaySource = ac.createMediaStreamSource(displayStream);
+            
+            const dest = ac.createMediaStreamDestination();
+            micSource.connect(dest);
+            displaySource.connect(dest);
+            
+            mixedStream = dest.stream;
+          }
+        } catch (err) {
+          console.warn("Display media capture failed or audio not shared:", err);
+        }
+      }
+
+      mediaStreamRef.current = mixedStream;
 
       const ws = new WebSocket(getWsUrl());
       wsRef.current = ws;
@@ -147,9 +180,9 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
 
           try {
             // Audio pipeline: capture PCM and send to server
-            const audioContext = new AudioContext({ sampleRate: 16000 });
+            const audioContext = audioContextRef.current || new AudioContext({ sampleRate: 16000 });
             audioContextRef.current = audioContext;
-            const source = audioContext.createMediaStreamSource(stream);
+            const source = audioContext.createMediaStreamSource(mixedStream);
             
             await audioContext.audioWorklet.addModule('/audio-processor.js');
             const processor = new AudioWorkletNode(audioContext, 'audio-processor');
@@ -285,13 +318,13 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
     }
   }, [isListening]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (options?: StartOptions) => {
     setConnectionStatus('connecting');
     setDuration(0);
     setIsListening(true);
 
     // Try Deepgram first, fallback to Web Speech API
-    const deepgramOk = await startDeepgram();
+    const deepgramOk = await startDeepgram(options);
     if (!deepgramOk) {
       console.log('Deepgram failed, falling back to Web Speech API...');
       // Small delay to allow the OS to fully release the microphone hardware lock

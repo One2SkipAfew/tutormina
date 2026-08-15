@@ -302,9 +302,14 @@ export default function VideoRoom() {
         {/* Start Transcription Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 16px', background: 'rgba(26,26,46,0.95)', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
           {!transcript.isListening ? (
-            <button className="ls-btn ls-btn-start" onClick={transcript.start} style={{ fontSize: '0.78rem', padding: '6px 16px' }}>
-              🎙️ Start Transcription
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button className="ls-btn ls-btn-start" onClick={() => transcript.start({ captureTabAudio: true })} style={{ fontSize: '0.78rem', padding: '6px 16px' }}>
+                🎙️ Start Transcription (Share Tab Audio)
+              </button>
+              <div style={{ fontSize: '0.75rem', color: '#f59e0b', maxWidth: '350px', lineHeight: 1.3 }}>
+                <strong>Important:</strong> When prompted, you MUST select <strong>This Tab</strong> and check <strong>Share tab audio</strong> to capture both voices.
+              </div>
+            </div>
           ) : (
             <>
               <div className="ls-status-badge" style={{ '--badge-color': '#22c55e' } as React.CSSProperties}>
