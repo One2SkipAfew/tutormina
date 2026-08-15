@@ -84,7 +84,7 @@ export default function DirectoryProfile() {
   };
 
   return (
-    <div style={{ background: '#f8fafc', minHeight: 'calc(100vh - 64px)', padding: '3rem 0' }}>
+    <div style={{ background: '#f8fafc', minHeight: 'calc(100vh - 64px)', padding: '2rem 0' }}>
       <div className="container" style={{ maxWidth: '800px' }}>
         <button 
           className="btn btn-outline" 
@@ -94,9 +94,9 @@ export default function DirectoryProfile() {
           &larr; Back to Directory
         </button>
 
-        <div className="glass-card" style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+        <div className="glass-card profile-card-layout">
           {/* Left Col: Avatar & Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '250px', flexShrink: 0 }}>
+          <div className="profile-left-col">
             <div style={{
               width: '150px',
               height: '150px',
@@ -140,8 +140,8 @@ export default function DirectoryProfile() {
           </div>
 
           {/* Right Col: Details */}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '1px solid #e2e8f0' }}>
+          <div className="profile-right-col">
+            <div className="profile-stats-row">
               <div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary-dark)' }}>
                   ★ {details.rating?.toFixed(1) || '0.0'}

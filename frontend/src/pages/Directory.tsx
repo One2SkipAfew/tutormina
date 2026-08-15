@@ -94,7 +94,7 @@ export default function Directory() {
         </div>
 
         {/* Filters */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '2.5rem' }}>
+        <div className="directory-filter-row">
           <button 
             className={`btn ${filterRole === 'all' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setFilterRole('all')}
@@ -185,11 +185,7 @@ export default function Directory() {
             No experts found matching your criteria.
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '2rem',
-          }}>
+          <div className="directory-provider-grid">
             {filteredProviders.map(provider => (
               <ProviderTile 
                 key={provider.id} 

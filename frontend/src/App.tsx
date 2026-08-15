@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Home from './pages/Home';
@@ -37,32 +38,40 @@ import './index.css';
 
 function PublicNav() {
   const { session, signOut } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
-    <nav style={{
-      padding: '1rem 0',
-      background: 'rgba(255, 255, 255, 0.9)',
-      backdropFilter: 'blur(10px)',
-      borderBottom: '1px solid var(--color-gray-warm)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 50
-    }}>
-      <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--color-spring-dark)', textDecoration: 'none' }}>
-          <img src="/logo.png" alt="TutorMina Logo" style={{ height: '32px' }} />
+    <nav className="public-nav">
+      <div className="container public-nav-inner">
+        <a href="/" className="public-nav-logo">
+          <img src="/logo.png" alt="TutorMina Logo" />
           TutorMina
         </a>
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <a href="/directory" style={{ fontWeight: 500, textDecoration: 'none', color: 'inherit' }}>Directory</a>
+        <button
+          className="public-nav-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Toggle navigation menu"
+        >
+          {mobileMenuOpen ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          )}
+        </button>
+        <div className={`public-nav-links ${mobileMenuOpen ? 'open' : ''}`}>
+          <a href="/directory" onClick={() => setMobileMenuOpen(false)}>Directory</a>
           {session ? (
             <>
-              <a href="/dashboard" style={{ fontWeight: 500, textDecoration: 'none', color: 'inherit' }}>Dashboard</a>
-              <button onClick={signOut} className="btn btn-outline" style={{ padding: '0.5rem 1rem' }}>Log Out</button>
+              <a href="/dashboard" onClick={() => setMobileMenuOpen(false)}>Dashboard</a>
+              <button onClick={() => { signOut(); setMobileMenuOpen(false); }} className="btn btn-outline" style={{ padding: '0.5rem 1rem' }}>Log Out</button>
             </>
           ) : (
             <>
-              <a href="/login" style={{ fontWeight: 500, textDecoration: 'none', color: 'inherit' }}>Login</a>
-              <a href="/register" className="btn btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }}>Get Started</a>
+              <a href="/login" onClick={() => setMobileMenuOpen(false)}>Login</a>
+              <a href="/register" className="btn btn-primary" style={{ padding: '0.5rem 1rem', textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>Get Started</a>
             </>
           )}
         </div>
@@ -79,10 +88,10 @@ function PublicLayout({ children }: { children: React.ReactNode }) {
       <footer className="site-footer" style={{ padding: '2rem 0', background: 'var(--color-olive-dark)', color: '#e0e0e0' }}>
         <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
           <p style={{ fontWeight: 600, fontSize: '1.2rem', color: '#fff', margin: 0 }}>TutorMina</p>
-          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.9rem' }}>
-            <a href="/terms" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Terms &amp; Conditions</a>
-            <a href="/privacy" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="/contact" style={{ color: '#e0e0e0', textDecoration: 'none' }}>Contact Us</a>
+          <div className="footer-links">
+            <a href="/terms">Terms &amp; Conditions</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/contact">Contact Us</a>
           </div>
           <p style={{ fontSize: '0.85rem', margin: 0, opacity: 0.8 }}>
             &copy; {new Date().getFullYear()} <a href="https://fromb2c.africa" target="_blank" rel="noopener noreferrer" style={{ color: '#fff', textDecoration: 'underline' }}>From B 2 C</a>. All rights reserved.

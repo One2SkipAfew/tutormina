@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <div className="animate-fade-in">
       {/* Section 1: Welcome / Hero */}
-      <section className="section" style={{ paddingTop: '8rem', paddingBottom: '8rem' }}>
+      <section className="section hero-section" style={{ paddingTop: '8rem', paddingBottom: '8rem' }}>
         <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           <img src="/logo.png" alt="TutorMina Logo" style={{ 
             width: '200px', 
@@ -22,13 +22,13 @@ export default function Home() {
             WebkitMaskImage: 'radial-gradient(circle, black 40%, transparent 70%)',
             maskImage: 'radial-gradient(circle, black 40%, transparent 70%)'
           }} />
-          <h1 style={{ color: 'var(--color-olive-dark)', fontSize: '3.5rem', marginBottom: '1rem' }}>
+          <h1 className="hero-title">
             Grow with TutorMina
           </h1>
-          <p style={{ fontSize: '1.25rem', color: 'var(--color-text-muted)', maxWidth: '600px', marginBottom: '2.5rem' }}>
+          <p className="hero-subtitle">
             Empowering students and professionals to smash their goals. Connect with expert tutors and experienced executive coaches for virtual, holistic support.
           </p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          <div className="hero-cta-row">
             <Link to="/directory" className="btn btn-primary" style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>Find a Tutor or Coach</Link>
           </div>
         </div>

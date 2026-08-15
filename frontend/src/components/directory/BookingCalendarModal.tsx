@@ -318,7 +318,8 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
     }}>
       <div className="animate-slide-up" style={{
         background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '800px',
-        maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column'
+        maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+        margin: '0 auto'
       }}>
 
         {/* Header */}
@@ -354,7 +355,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
           </div>
         ) : (
           <div style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div className="booking-modal-grid">
 
               {/* Left Col: Calendar & Duration */}
               <div>
@@ -486,7 +487,7 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
             {/* Topic + Note - full width */}
             <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid #eee' }}>
               <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>4. Anything you'd like to share? (optional)</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="booking-modal-extras-grid">
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem' }}>
                     What would you like help with?

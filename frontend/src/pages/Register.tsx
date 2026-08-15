@@ -128,7 +128,7 @@ export default function Register() {
   };
 
   return (
-    <div className="container animate-fade-in" style={{ paddingTop: '4rem', maxWidth: '600px' }}>
+    <div className="container animate-fade-in" style={{ paddingTop: '3rem', maxWidth: '600px' }}>
       <div className="glass-card">
         <h2 style={{ textAlign: 'center', marginBottom: '2rem', color: 'var(--color-olive-dark)' }}>
           Join TutorMina
