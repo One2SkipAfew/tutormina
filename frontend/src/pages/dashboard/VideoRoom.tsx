@@ -78,13 +78,13 @@ export default function VideoRoom() {
     setIsSavingUrl(true);
     const { error } = await supabase
       .from('video_rooms')
-      .update({ daily_room_url: dailyUrlInput.trim() })
+      .update({ daily_room_url: dailyUrlInput.trim(), status: 'active' })
       .eq('id', roomId);
       
     if (error) {
       showModal({ type: 'error', title: 'Error', message: 'Failed to save room URL.' });
     } else {
-      setRoom(prev => prev ? { ...prev, daily_room_url: dailyUrlInput.trim() } : prev);
+      setRoom(prev => prev ? { ...prev, daily_room_url: dailyUrlInput.trim(), status: 'active' } : prev);
       showModal({ type: 'success', title: 'Success', message: 'Room URL updated successfully.' });
     }
     setIsSavingUrl(false);
@@ -228,10 +228,10 @@ export default function VideoRoom() {
       {/* Main Video Area */}
       <div style={{ flex: sidebarOpen ? '2' : '1', display: 'flex', flexDirection: 'column', background: '#000', position: 'relative' }}>
         {/* Video Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'linear-gradient(135deg, #1a1a2e, #16213e)', color: '#e2e8f0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 24px', background: 'rgba(26,26,46,0.95)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '0.65rem', background: room.status === 'active' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)', color: room.status === 'active' ? '#22c55e' : '#f59e0b', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
-              {room.status === 'active' ? '🟢 LIVE' : room.status === 'ended' ? '🔴 ENDED' : '🟡 WAITING'}
+            <span style={{ fontSize: '0.65rem', background: (room.status === 'active' || !!room.daily_room_url) && room.status !== 'ended' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)', color: (room.status === 'active' || !!room.daily_room_url) && room.status !== 'ended' ? '#22c55e' : '#f59e0b', padding: '2px 8px', borderRadius: '10px', fontWeight: 700 }}>
+              {(room.status === 'active' || !!room.daily_room_url) && room.status !== 'ended' ? '🟢 LIVE' : room.status === 'ended' ? '🔴 ENDED' : '🟡 WAITING'}
             </span>
             <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700 }}>{room.room_name}</h3>
           </div>
