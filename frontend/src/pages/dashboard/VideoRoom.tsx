@@ -68,6 +68,27 @@ export default function VideoRoom() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
+  // Daily.co URL input for host
+  const [dailyUrlInput, setDailyUrlInput] = useState('');
+  const [isSavingUrl, setIsSavingUrl] = useState(false);
+
+  const handleSaveDailyUrl = async () => {
+    if (!dailyUrlInput.trim() || !roomId) return;
+    setIsSavingUrl(true);
+    const { error } = await supabase
+      .from('video_rooms')
+      .update({ daily_room_url: dailyUrlInput.trim() })
+      .eq('id', roomId);
+      
+    if (error) {
+      showModal({ type: 'error', title: 'Error', message: 'Failed to save room URL.' });
+    } else {
+      setRoom(prev => prev ? { ...prev, daily_room_url: dailyUrlInput.trim() } : prev);
+      showModal({ type: 'success', title: 'Success', message: 'Room URL updated successfully.' });
+    }
+    setIsSavingUrl(false);
+  };
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
@@ -248,8 +269,32 @@ export default function VideoRoom() {
             <h3 style={{ color: '#e2e8f0', margin: 0 }}>Room Not Ready</h3>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '400px', textAlign: 'center' }}>
               The video room hasn't been set up with Daily.co yet.
-              The host needs to create a Daily.co room and update the room URL.
+              {profile?.id !== room.host_id && " Please wait for the host to set up the room."}
             </p>
+            {profile?.id === room.host_id && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', marginTop: '1rem', background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: '12px' }}>
+                <p style={{ fontSize: '0.85rem', color: '#e2e8f0', margin: 0, textAlign: 'center', maxWidth: '350px' }}>
+                  As the host, you need to create a room in your <a href="https://dashboard.daily.co/" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>Daily.co Dashboard</a> and paste the URL here:
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                  <input
+                    type="url"
+                    placeholder="https://your-domain.daily.co/room-name"
+                    value={dailyUrlInput}
+                    onChange={(e) => setDailyUrlInput(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                  />
+                  <button
+                    onClick={handleSaveDailyUrl}
+                    disabled={isSavingUrl || !dailyUrlInput}
+                    className="btn btn-primary"
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    {isSavingUrl ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
