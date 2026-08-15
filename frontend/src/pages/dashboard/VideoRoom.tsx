@@ -44,6 +44,7 @@ export default function VideoRoom() {
     daily_room_url: string | null;
     status: string;
     booking_id: string | null;
+    host_id: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const { showModal } = useModal();
