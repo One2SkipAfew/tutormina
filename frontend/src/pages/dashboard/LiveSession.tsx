@@ -122,7 +122,7 @@ export default function LiveSession() {
           </div>
 
           {!transcript.isListening ? (
-            <button className="ls-btn ls-btn-start" onClick={transcript.start} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button className="ls-btn ls-btn-start" onClick={() => transcript.start()} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Mic size={16} /> Start Recording
             </button>
           ) : (
