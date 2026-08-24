@@ -30,6 +30,11 @@ ai-api/venv/
 supabase/.temp/
 supabase/.branches/
 
+# Database backup dumps (contain user PII, never commit)
+*_backup*.sql
+tutormina_backup_full.sql
+tutormina_backup_data.sql
+
 # Build outputs
 frontend/dist/
 ai-api/dist/
