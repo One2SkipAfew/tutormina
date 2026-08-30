@@ -11,6 +11,8 @@ import {
   ChevronUp, Loader2, CheckCircle2, Copy, Download,
 } from 'lucide-react';
 import { useModal } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { uploadFile } from '../../lib/sharedDrive';
 import '../../styles/shared-drive.css';
 import '../../styles/messaging.css';
 
@@ -288,6 +290,7 @@ function FileDropZone({ accept, label, icon, onChange, file }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AIInsights() {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<ToolTab>('text');
   const [textInput, setTextInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
@@ -412,9 +415,31 @@ export default function AIInsights() {
     setSavingNote(true);
     try {
       await saveSessionNote({ title: noteTitle.trim(), transcript: result.extractedText || textInput || '', summary: result.summary ?? undefined, key_topics: result.keyTopics });
+      
+      const isProfessional = profile?.role === 'tutor' || profile?.role === 'coach';
+      
+      if (isProfessional) {
+        // Sync to My Resources as a text file
+        const content = `${result.summary ? `Summary:\n${result.summary}\n\n` : ''}${result.keyTopics.length ? `Key Topics:\n${result.keyTopics.join(', ')}\n\n` : ''}Content:\n${result.extractedText || textInput || ''}`;
+        const fileBlob = new Blob([content], { type: 'text/plain' });
+        const file = new File([fileBlob], `${noteTitle.trim()}.txt`, { type: 'text/plain' });
+        
+        await uploadFile(file, {
+          title: noteTitle.trim(),
+          description: 'AI Generated Session Note',
+          file_type: 'notes',
+          visibility: 'private'
+        });
+      }
+
       setNoteTitle('');
       loadNotes();
-      showModal({ type: 'success', title: 'Note Saved', message: 'Check your Learning Zone for access to the saved material.', buttons: [{ label: 'Dismiss', variant: 'primary', onClick: 'dismiss' }] });
+      
+      const destinationMsg = isProfessional 
+        ? "Check your 'My Resources' section for the notes." 
+        : "Check your Learning Zone for access to the saved material.";
+        
+      showModal({ type: 'success', title: 'Note Saved', message: destinationMsg, buttons: [{ label: 'Dismiss', variant: 'primary', onClick: 'dismiss' }] });
     } catch (err) {
       handleError(err, 'Saving note');
     }
