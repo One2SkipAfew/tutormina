@@ -16,6 +16,23 @@ import '../../styles/messaging.css';
 
 type ToolTab = 'text' | 'pdf' | 'image' | 'web' | 'stt' | 'tts';
 
+interface ToolDef {
+  id: ToolTab;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  description: string;
+}
+
+const TOOLS: ToolDef[] = [
+  { id: 'text', label: 'Text Tools', icon: <FileText size={24} />, color: '#7c3aed', description: 'Paste any text to get an instant summary, key points and topic analysis.' },
+  { id: 'pdf', label: 'PDF Parser', icon: <FileJson size={24} />, color: '#2563eb', description: 'Upload a PDF to extract its full text, ready for AI analysis.' },
+  { id: 'image', label: 'Image OCR', icon: <ImageIcon size={24} />, color: '#db2777', description: 'Upload a photo or scan to pull out any text it contains — handwriting included.' },
+  { id: 'web', label: 'Web Scraper', icon: <Globe size={24} />, color: '#059669', description: 'Paste a URL to pull in an article or page for analysis.' },
+  { id: 'stt', label: 'Speech to Text', icon: <Mic size={24} />, color: '#d97706', description: 'Upload an audio recording to get a full written transcript.' },
+  { id: 'tts', label: 'Text to Speech', icon: <Volume2 size={24} />, color: '#0891b2', description: 'Turn any written text into natural-sounding spoken audio.' },
+];
+
 interface AnalysisResult {
   extractedText: string | null;
   summary: string | null;
@@ -413,14 +430,7 @@ export default function AIInsights() {
     }
   };
 
-  const tabs = [
-    { id: 'text' as ToolTab, label: 'Text Tools', icon: <FileText size={15} /> },
-    { id: 'pdf' as ToolTab, label: 'PDF Parser', icon: <FileJson size={15} /> },
-    { id: 'image' as ToolTab, label: 'Image OCR', icon: <ImageIcon size={15} /> },
-    { id: 'web' as ToolTab, label: 'Web Scraper', icon: <Globe size={15} /> },
-    { id: 'stt' as ToolTab, label: 'Speech to Text', icon: <Mic size={15} /> },
-    { id: 'tts' as ToolTab, label: 'Text to Speech', icon: <Volume2 size={15} /> },
-  ];
+  const activeTool = TOOLS.find((t) => t.id === activeTab)!;
 
   return (
     <div className="animate-slide-up">
@@ -449,35 +459,55 @@ export default function AIInsights() {
         </div>
       </div>
 
-      {/* Feature cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '0.85rem', marginBottom: '1.75rem' }}>
-        {[
-          { icon: <BookOpen size={26} />, title: 'AI Summary', desc: 'Concise paragraphs capturing the essence of your content.', color: '#7c3aed' },
-          { icon: <Lightbulb size={26} />, title: 'AI Insights', desc: 'Numbered, actionable observations from the material.', color: '#f59e0b' },
-          { icon: <CheckCircle2 size={26} />, title: 'Key Points', desc: 'Bullet-point highlights of the most important facts.', color: '#0ea5e9' },
-          { icon: <Tag size={26} />, title: 'Topic Analysis', desc: 'Core concepts and themes surfaced automatically.', color: '#10b981' },
-        ].map(c => (
-          <div key={c.title} className="content-panel">
-            <div className="content-panel-body" style={{ textAlign: 'center', padding: '1.25rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ background: `${c.color}15`, color: c.color, padding: '0.85rem', borderRadius: '50%', marginBottom: '0.75rem' }}>{c.icon}</div>
-              <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.25rem' }}>{c.title}</div>
-              <div style={{ fontSize: '0.77rem', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{c.desc}</div>
-            </div>
+      {/* Tool tiles — these ARE the features. Pick one to see what it does and use it. */}
+      <div
+        role="tablist"
+        aria-label="AI tools"
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}
+      >
+        {TOOLS.map((tool) => {
+          const active = activeTab === tool.id;
+          return (
+            <button
+              key={tool.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => handleTabChange(tool.id)}
+              className="content-panel"
+              style={{
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: active ? `2px solid ${tool.color}` : '1px solid rgba(0,0,0,0.06)',
+                boxShadow: active ? `0 4px 20px ${tool.color}30` : 'none',
+                background: active ? `${tool.color}08` : '#fff',
+                transition: 'all 0.15s',
+                padding: 0,
+                font: 'inherit',
+              }}
+            >
+              <div style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                  <div style={{ background: `${tool.color}18`, color: tool.color, padding: '0.6rem', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+                    {tool.icon}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: active ? tool.color : '#1e293b' }}>{tool.label}</div>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{tool.description}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Selected-tool intro + input panel */}
+      <div className="content-panel" style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.9rem 1.25rem', background: `${activeTool.color}10`, borderBottom: `1px solid ${activeTool.color}25` }}>
+          <span style={{ color: activeTool.color, display: 'flex' }}>{activeTool.icon}</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: activeTool.color }}>{activeTool.label}</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{activeTool.description}</div>
           </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '4px' }}>
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => handleTabChange(tab.id)} className={`ai-tools-tab ${activeTab === tab.id ? 'active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', whiteSpace: 'nowrap', cursor: 'pointer', border: 'none' }}>
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Input panel */}
-      <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
+        </div>
         <div className="content-panel-body">
           {activeTab === 'text' && (
             <>
