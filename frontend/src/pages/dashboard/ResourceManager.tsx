@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createFolder, getFolders, deleteFolder, updateFolder } from '../../lib/sharedDrive';
-import { getFiles, uploadFile, deleteFile as deleteSharedFile } from '../../lib/sharedDrive';
+import { getFiles, uploadFile, deleteFile as deleteSharedFile, updateFile } from '../../lib/sharedDrive';
 import { getZoneColor, getFileTypeIcon, formatFileSize, getAllowedExtensionsForType } from '../../types/lms';
 import type { Folder, SharedFile, FileType, FileVisibility } from '../../types/lms';
 import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic } from 'lucide-react';
@@ -52,6 +52,15 @@ export default function ResourceManager() {
   // Edit folder
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
   const [editFolderName, setEditFolderName] = useState('');
+
+  // Select and Edit file
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [editingFile, setEditingFile] = useState<SharedFile | null>(null);
+  const [editFileTitle, setEditFileTitle] = useState('');
+  const [editFileDesc, setEditFileDesc] = useState('');
+  const [editFileType, setEditFileType] = useState<FileType>('document');
+  const [editFileVisibility, setEditFileVisibility] = useState<FileVisibility>('public');
+  const [updatingFile, setUpdatingFile] = useState(false);
 
   const zoneColor = zone === 'tutor' ? 'var(--zone-tutor)' : zone === 'coach' ? 'var(--zone-coach)' : 'var(--zone-student)';
 
@@ -104,14 +113,26 @@ export default function ResourceManager() {
   };
 
   // Delete folder
-  const handleDeleteFolder = async (folderId: string) => {
-    if (!confirm('Delete this folder and all its contents?')) return;
-    try {
-      await deleteFolder(folderId);
-      loadData();
-    } catch (err) {
-      console.error('Failed to delete folder:', err);
-    }
+  const handleDeleteFolder = (folderId: string) => {
+    showModal({
+      type: 'warning',
+      title: 'Delete Folder',
+      message: 'Delete this folder and all its contents?',
+      buttons: [
+        { label: 'Cancel', variant: 'outline', onClick: 'dismiss' },
+        {
+          label: 'Delete',
+          onClick: async () => {
+            try {
+              await deleteFolder(folderId);
+              loadData();
+            } catch (err) {
+              console.error('Failed to delete folder:', err);
+            }
+          }
+        }
+      ]
+    });
   };
 
   // Rename folder
@@ -153,13 +174,46 @@ export default function ResourceManager() {
   };
 
   // Delete file
-  const handleDeleteFile = async (fileId: string) => {
-    if (!confirm('Delete this file permanently?')) return;
+  const handleDeleteFile = (fileId: string) => {
+    showModal({
+      type: 'warning',
+      title: 'Delete File',
+      message: 'Delete this file permanently?',
+      buttons: [
+        { label: 'Cancel', variant: 'outline', onClick: 'dismiss' },
+        {
+          label: 'Delete',
+          onClick: async () => {
+            try {
+              await deleteSharedFile(fileId);
+              if (selectedFileId === fileId) setSelectedFileId(null);
+              loadData();
+            } catch (err) {
+              console.error('Failed to delete file:', err);
+            }
+          }
+        }
+      ]
+    });
+  };
+
+  // Update file
+  const handleUpdateFile = async () => {
+    if (!editingFile || !editFileTitle.trim()) return;
+    setUpdatingFile(true);
     try {
-      await deleteSharedFile(fileId);
+      await updateFile(editingFile.id, {
+        title: editFileTitle.trim(),
+        description: editFileDesc || null,
+        file_type: editFileType,
+        visibility: editFileVisibility,
+      });
+      setEditingFile(null);
       loadData();
     } catch (err) {
-      console.error('Failed to delete file:', err);
+      showModal({ type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Update failed', buttons: [{ label: 'OK', onClick: 'dismiss' }] });
+    } finally {
+      setUpdatingFile(false);
     }
   };
 
@@ -240,6 +294,31 @@ export default function ResourceManager() {
           >
             ⬆️ Upload File
           </button>
+          <button
+            className="btn btn-outline"
+            style={{ padding: '0.5rem 0.85rem', fontSize: '0.82rem', opacity: selectedFileId ? 1 : 0.5, cursor: selectedFileId ? 'pointer' : 'not-allowed' }}
+            disabled={!selectedFileId}
+            onClick={() => {
+              const file = files.find(f => f.id === selectedFileId);
+              if (file) {
+                setEditingFile(file);
+                setEditFileTitle(file.title);
+                setEditFileDesc(file.description || '');
+                setEditFileType(file.file_type);
+                setEditFileVisibility(file.visibility);
+              }
+            }}
+          >
+            ✏️ Edit File
+          </button>
+          <button
+            className="btn btn-outline"
+            style={{ padding: '0.5rem 0.85rem', fontSize: '0.82rem', opacity: selectedFileId ? 1 : 0.5, cursor: selectedFileId ? 'pointer' : 'not-allowed' }}
+            disabled={!selectedFileId}
+            onClick={() => selectedFileId && handleDeleteFile(selectedFileId)}
+          >
+            🗑️ Delete File
+          </button>
           <div className="view-toggle">
             <button
               className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -298,7 +377,6 @@ export default function ResourceManager() {
               )}
               <div className="folder-card-menu">
                 <button
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '0.25rem' }}
                   onClick={e => {
                     e.stopPropagation();
                     setEditingFolder(folder);
@@ -307,7 +385,6 @@ export default function ResourceManager() {
                   title="Rename"
                 >✏️</button>
                 <button
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: '0.25rem' }}
                   onClick={e => {
                     e.stopPropagation();
                     handleDeleteFolder(folder.id);
@@ -320,7 +397,15 @@ export default function ResourceManager() {
 
           {/* Files */}
           {files.map(file => (
-            <div key={file.id} className="file-card">
+            <div 
+              key={file.id} 
+              className={`file-card ${selectedFileId === file.id ? 'selected' : ''}`}
+              onClick={() => setSelectedFileId(selectedFileId === file.id ? null : file.id)}
+              style={{
+                border: selectedFileId === file.id ? `2px solid ${zoneColor}` : undefined,
+                cursor: 'pointer'
+              }}
+            >
               <div className={`file-card-thumbnail ${file.file_type}`}>
                 {getFileTypeIcon(file.file_type)}
                 <span className="file-card-type-badge">{file.file_type.replace('_', ' ')}</span>
@@ -342,18 +427,26 @@ export default function ResourceManager() {
                 </div>
                 {file.ai_summary && <div className="file-card-ai-badge">✨ AI Summary</div>}
               </div>
-              <button
-                style={{
-                  position: 'absolute', top: '0.5rem', right: '0.5rem',
-                  background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff',
-                  borderRadius: '4px', padding: '0.15rem 0.35rem', cursor: 'pointer',
-                  fontSize: '0.7rem', opacity: 0, transition: 'opacity 0.15s',
-                }}
-                onMouseOver={e => (e.currentTarget.style.opacity = '1')}
-                onMouseOut={e => (e.currentTarget.style.opacity = '0')}
-                onClick={() => handleDeleteFile(file.id)}
-                title="Delete file"
-              >🗑️</button>
+              <div className="file-card-menu">
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setEditingFile(file);
+                    setEditFileTitle(file.title);
+                    setEditFileDesc(file.description || '');
+                    setEditFileType(file.file_type);
+                    setEditFileVisibility(file.visibility);
+                  }}
+                  title="Edit file"
+                >✏️</button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleDeleteFile(file.id);
+                  }}
+                  title="Delete file"
+                >🗑️</button>
+              </div>
             </div>
           ))}
         </div>
@@ -536,6 +629,78 @@ export default function ResourceManager() {
                 style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', background: zoneColor }}
               >
                 {uploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit File Modal */}
+      {editingFile && (
+        <div className="upload-modal-overlay" onClick={() => setEditingFile(null)}>
+          <div className="upload-modal" onClick={e => e.stopPropagation()}>
+            <div className="upload-modal-header">
+              <h3 className="upload-modal-title">✏️ Edit File</h3>
+              <button className="upload-modal-close" onClick={() => setEditingFile(null)}>×</button>
+            </div>
+            <div className="upload-modal-body">
+              <div className="upload-form-group">
+                <label className="upload-form-label">Title</label>
+                <input
+                  className="upload-form-input"
+                  type="text"
+                  value={editFileTitle}
+                  onChange={e => setEditFileTitle(e.target.value)}
+                  placeholder="e.g. Chapter 5 Notes — Trigonometry"
+                />
+              </div>
+
+              <div className="upload-form-group">
+                <label className="upload-form-label">Description (optional)</label>
+                <textarea
+                  className="upload-form-textarea"
+                  value={editFileDesc}
+                  onChange={e => setEditFileDesc(e.target.value)}
+                  placeholder="Briefly describe this resource..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="upload-form-row">
+                <div className="upload-form-group">
+                  <label className="upload-form-label">File Type</label>
+                  <select className="upload-form-select" value={editFileType} onChange={e => setEditFileType(e.target.value as FileType)}>
+                    <option value="document">📄 Document</option>
+                    <option value="video">🎬 Video</option>
+                    <option value="past_paper">📝 Past Paper</option>
+                    <option value="notes">📒 Notes</option>
+                    <option value="course_material">📚 Course Material</option>
+                    <option value="recording">🎙️ Recording</option>
+                    <option value="other">📎 Other</option>
+                  </select>
+                </div>
+                <div className="upload-form-group">
+                  <label className="upload-form-label">Visibility</label>
+                  <select className="upload-form-select" value={editFileVisibility} onChange={e => setEditFileVisibility(e.target.value as FileVisibility)}>
+                    <option value="private">🔒 Draft (Only you can see this)</option>
+                    <option value="students_only">📖 Published (Your Students Only)</option>
+                    <option value="tutors_coaches_only">🎓 Published (Tutors & Coaches Only)</option>
+                    <option value="public">🌍 Published (Everyone)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="upload-modal-footer">
+              <button className="btn btn-outline" onClick={() => setEditingFile(null)} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleUpdateFile}
+                disabled={!editFileTitle.trim() || updatingFile}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', background: zoneColor }}
+              >
+                {updatingFile ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
