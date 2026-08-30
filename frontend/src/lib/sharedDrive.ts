@@ -243,6 +243,77 @@ export async function deleteFile(fileId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ============ DOWNLOAD ============
+
+/**
+ * Map a MIME type to a sensible file extension.
+ * Falls back to extracting the extension from the storage_path.
+ */
+function resolveExtension(mimeType: string | null, storagePath: string): string {
+  // Try to extract from the storage path first (most reliable)
+  const pathExt = storagePath.split('.').pop()?.toLowerCase();
+  if (pathExt && pathExt.length <= 5 && pathExt !== storagePath) {
+    return '.' + pathExt;
+  }
+  // Fall back to MIME type mapping
+  const mimeMap: Record<string, string> = {
+    'application/pdf': '.pdf',
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'application/vnd.ms-powerpoint': '.ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+    'text/plain': '.txt',
+    'text/csv': '.csv',
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'video/mp4': '.mp4',
+    'video/webm': '.webm',
+    'video/quicktime': '.mov',
+    'audio/mpeg': '.mp3',
+    'audio/wav': '.wav',
+    'audio/ogg': '.ogg',
+    'application/zip': '.zip',
+    'application/x-rar-compressed': '.rar',
+  };
+  return mimeType ? (mimeMap[mimeType] ?? '') : '';
+}
+
+/**
+ * Download a SharedFile with the correct filename and extension.
+ * Fetches the file as a blob so the browser saves it with the right name,
+ * regardless of what the public URL's Content-Disposition says.
+ */
+export async function downloadFile(file: { file_url: string | null; storage_path: string; title: string; mime_type: string | null }): Promise<void> {
+  if (!file.file_url) throw new Error('No file URL available');
+
+  const ext = resolveExtension(file.mime_type, file.storage_path);
+  // Sanitise title for use as a filename
+  const safeName = file.title.replace(/[/\\?%*:|"<>]/g, '-');
+  const downloadName = safeName.endsWith(ext) ? safeName : safeName + ext;
+
+  const response = await fetch(file.file_url);
+  if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+
+  const blob = await response.blob();
+  // Use the stored mime_type if available, otherwise fall back to what the server returned
+  const blobType = file.mime_type || blob.type;
+  const typedBlob = blobType ? new Blob([blob], { type: blobType }) : blob;
+
+  const objectUrl = URL.createObjectURL(typedBlob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = downloadName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  // Revoke after a short delay to let the download start
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+}
+
 export async function updateFile(
   fileId: string,
   updates: Partial<Pick<SharedFile, 'title' | 'description' | 'file_type' | 'visibility' | 'folder_id' | 'ai_summary' | 'ai_insights' | 'ai_key_topics'>>
@@ -304,3 +375,81 @@ export async function markAllAlertsRead(): Promise<void> {
   if (!user) return;
   await supabase.from('resource_alerts').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
 }
+
+// ============ STUDENT RESOURCE ACCESS CONTROL ============
+
+export async function grantStudentResourceAccess(
+  studentId: string,
+  options: {
+    grantAll?: boolean;
+    fileIds?: string[];
+    providerId?: string;
+  } = {}
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const providerId = options.providerId || user.id;
+
+  // Clear existing grants for this student and provider first to avoid duplicates
+  await supabase
+    .from('student_resource_access')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('provider_id', providerId);
+
+  if (options.grantAll) {
+    const { error } = await supabase.from('student_resource_access').insert({
+      student_id: studentId,
+      provider_id: providerId,
+      grant_all: true,
+      file_id: null,
+    });
+    if (error) throw error;
+  } else if (options.fileIds && options.fileIds.length > 0) {
+    const rows = options.fileIds.map((fileId) => ({
+      student_id: studentId,
+      provider_id: providerId,
+      grant_all: false,
+      file_id: fileId,
+    }));
+    const { error } = await supabase.from('student_resource_access').insert(rows);
+    if (error) throw error;
+  }
+}
+
+export async function getStudentResourceGrants(studentId: string, providerId?: string): Promise<{ grantAll: boolean; fileIds: string[] }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const pid = providerId || user.id;
+
+  const { data, error } = await supabase
+    .from('student_resource_access')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('provider_id', pid);
+
+  if (error) throw error;
+
+  const grantAll = (data ?? []).some((r) => r.grant_all);
+  const fileIds = (data ?? []).filter((r) => !r.grant_all && r.file_id).map((r) => r.file_id as string);
+
+  return { grantAll, fileIds };
+}
+
+export async function revokeStudentResourceAccess(studentId: string, providerId?: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const pid = providerId || user.id;
+
+  const { error } = await supabase
+    .from('student_resource_access')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('provider_id', pid);
+
+  if (error) throw error;
+}
+

@@ -7,6 +7,7 @@ import { getAdminDashboardStats, getRecentAdminActivity, type AdminActivityItem 
 import { getMyStudents } from '../../lib/students';
 import { getMyBookingsAsCustomer } from '../../lib/bookings';
 import { getLearningStreak } from '../../lib/learningZone';
+import { getFiles } from '../../lib/sharedDrive';
 import { supabase } from '../../lib/supabaseClient';
 import SessionCompletionPrompt from '../../components/shared/SessionCompletionPrompt';
 
@@ -95,10 +96,14 @@ async function getCustomerStats(): Promise<StatItem[]> {
   const now = new Date();
   const upcoming = bookings.filter((b) => new Date(b.session_date) >= now && b.status !== 'cancelled').length;
   const completed = bookings.filter((b) => b.status === 'completed').length;
-  const [{ count: resourcesCount }, streak] = await Promise.all([
-    supabase.from('shared_files').select('*', { count: 'exact', head: true }).in('visibility', ['public', 'students_only']),
+  const [accessibleFiles, streak] = await Promise.all([
+    // Use getFiles() so the count goes through the same RLS policies as SharedDrive.
+    // The raw .count() query ignores have_booking_together() and would show a higher
+    // number than what the student can actually access.
+    getFiles(),
     getLearningStreak(),
   ]);
+  const resourcesCount = accessibleFiles.length;
 
   return [
     { icon: <BookOpen size={24} />, value: String(resourcesCount ?? 0), label: 'Resources Available', to: '/dashboard/shared-drive' },

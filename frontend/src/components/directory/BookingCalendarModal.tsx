@@ -234,14 +234,8 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
       if (topic) lines.push(`Topic: ${topic}`);
       if (note.trim()) lines.push(`Note: ${note.trim()}`);
       await sendMessage(conversation.id, lines.join('\n'));
-      
-      // Also insert a notification for the student so it shows in their recent activity
-      await supabase.from('user_notifications').insert({
-        user_id: currentUser.id,
-        title: bookingType === 'intro_call' ? 'Requested Intro Call' : 'Requested Session',
-        body: `You requested a ${bookingType === 'intro_call' ? 'free intro call' : 'session'} with ${provider.first_name} on ${sessionDate.toLocaleDateString(undefined, { dateStyle: 'medium' })}.`,
-        link: '/dashboard/bookings'
-      });
+      // Both parties' in-app notifications are raised by the on_new_booking_request DB trigger
+      // (notifications is trigger-only — clients hold no INSERT grant on it by design).
     } catch {
       // Non-fatal - the booking itself already succeeded.
     }
@@ -280,6 +274,34 @@ export default function BookingCalendarModal({ provider, onClose, editingBooking
       });
     } catch {
       // Non-fatal — booking confirmation email is best-effort.
+    }
+
+    // Best-effort: let the professional know a new request came in via email too (they
+    // already get an in-app notification via the message sent above).
+    try {
+      const aiApiUrl = import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8000';
+      const endTime = new Date(sessionDate.getTime() + selectedDuration * 60000);
+
+      await fetch(`${aiApiUrl}/send-booking-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: provider.email,
+          student_name: `${currentUser.first_name} ${currentUser.last_name}`,
+          provider_name: `${provider.first_name} ${provider.last_name}`,
+          date: sessionDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+          time: `${selectedSlot} – ${endTime.toTimeString().slice(0, 5)}`,
+          duration: `${selectedDuration} minutes`,
+          topic: topic || undefined,
+          notes: note.trim() || undefined,
+          booking_type: bookingType,
+          login_url: `${window.location.origin}/dashboard/calendar`,
+          audience: 'professional',
+          stage: 'requested',
+        }),
+      });
+    } catch {
+      // Non-fatal — professional notification email is best-effort.
     }
   };
 

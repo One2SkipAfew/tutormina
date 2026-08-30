@@ -327,10 +327,18 @@ export default function ResourceManager() {
               </div>
               <div className="file-card-body">
                 <div className="file-card-title">{file.title}</div>
-                <div className="file-card-meta">
+                <div className="file-card-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginTop: '0.25rem' }}>
                   <span>{formatFileSize(file.file_size_bytes)}</span>
                   <span>•</span>
                   <span>{new Date(file.created_at).toLocaleDateString()}</span>
+                  <span>•</span>
+                  <span style={{ 
+                    padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600,
+                    background: file.visibility === 'private' ? '#f1f5f9' : '#e0e7ff',
+                    color: file.visibility === 'private' ? '#64748b' : '#4338ca' 
+                  }}>
+                    {file.visibility === 'private' ? 'Draft' : 'Published'}
+                  </span>
                 </div>
                 {file.ai_summary && <div className="file-card-ai-badge">✨ AI Summary</div>}
               </div>
@@ -509,10 +517,10 @@ export default function ResourceManager() {
                 <div className="upload-form-group">
                   <label className="upload-form-label">Visibility</label>
                   <select className="upload-form-select" value={uploadVisibility} onChange={e => setUploadVisibility(e.target.value as FileVisibility)}>
-                    <option value="public">🌍 Public (Everyone)</option>
-                    <option value="students_only">📖 Students Only</option>
-                    <option value="tutors_coaches_only">🎓 Tutors & Coaches Only</option>
-                    <option value="private">🔒 Private</option>
+                    <option value="private">🔒 Draft (Only you can see this)</option>
+                    <option value="students_only">📖 Published (Your Students Only)</option>
+                    <option value="tutors_coaches_only">🎓 Published (Tutors & Coaches Only)</option>
+                    <option value="public">🌍 Published (Everyone)</option>
                   </select>
                 </div>
               </div>

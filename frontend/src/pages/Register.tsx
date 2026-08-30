@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Eye, EyeOff } from 'lucide-react';
 import { useModal } from '../contexts/NotificationContext';
@@ -18,6 +18,15 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const { showModal } = useModal();
+  const [searchParams] = useSearchParams();
+
+  // Pre-select role from ?role=student or ?role=professional query param
+  useEffect(() => {
+    const roleParam = searchParams.get('role');
+    if (roleParam === 'student') handleUserTypeSelect('student');
+    else if (roleParam === 'professional') handleUserTypeSelect('professional');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleUserTypeSelect = (type: UserType) => {
     setUserType(type);

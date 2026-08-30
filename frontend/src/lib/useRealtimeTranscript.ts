@@ -184,7 +184,8 @@ export function useRealtimeTranscript(): UseRealtimeTranscriptReturn {
             audioContextRef.current = audioContext;
             const source = audioContext.createMediaStreamSource(mixedStream);
             
-            await audioContext.audioWorklet.addModule('/audio-processor.js');
+            const audioWorkletUrl = `${window.location.origin}/audio-processor.js`;
+            await audioContext.audioWorklet.addModule(audioWorkletUrl);
             const processor = new AudioWorkletNode(audioContext, 'audio-processor');
             processorRef.current = processor;
 

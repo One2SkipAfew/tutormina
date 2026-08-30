@@ -15,8 +15,9 @@ import {
   type MyTutor,
 } from '../../lib/learningZone';
 import { uploadStudentDocument } from '../../lib/studentDetails';
+import { getSessionNotes, deleteSessionNote, type AiSessionNote } from '../../lib/aiNotes';
 import { useModal } from '../../contexts/NotificationContext';
-import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send, Mic } from 'lucide-react';
+import { Target, Calendar as CalendarIcon, Upload, BookOpen, Clock, FileText, Flame, ClipboardList, CheckCircle, TrendingUp, Send, Mic, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 
 const EVENT_TYPE_LABELS: Record<LearningEvent['event_type'], string> = {
   benchmark: 'Benchmark',
@@ -43,9 +44,13 @@ export default function LearningZone() {
 
   const [events, setEvents] = useState<LearningEvent[]>([]);
   const [recordings, setRecordings] = useState<SessionRecording[]>([]);
+  const [aiNotes, setAiNotes] = useState<AiSessionNote[]>([]);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
   const { showModal } = useModal();
+
+  const [notesFilter, setNotesFilter] = useState<'all' | 'ai' | 'live'>('all');
+  const [expandedNote, setExpandedNote] = useState<string | null>(null);
 
   const [eventType, setEventType] = useState<LearningEvent['event_type']>('benchmark');
   const [title, setTitle] = useState('');
@@ -66,16 +71,18 @@ export default function LearningZone() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [ev, tut, s, rec] = await Promise.all([
+      const [ev, tut, s, rec, ain] = await Promise.all([
         getMyLearningEvents(),
         getMyTutors(),
         getLearningStreak(),
         getMyRecentRecordings(),
+        getSessionNotes(),
       ]);
       setEvents(ev);
       setTutors(tut);
       setStreak(s);
       setRecordings(rec);
+      setAiNotes(ain);
     } catch (err) {
       showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load learning zone', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
@@ -145,6 +152,22 @@ export default function LearningZone() {
     return a.event_date.localeCompare(b.event_date);
   });
   const completed = events.filter((e) => e.status === 'completed').sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+  const handleDeleteAiNote = async (id: string) => {
+    try {
+      await deleteSessionNote(id);
+      setAiNotes((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      showModal({ type: 'error', title: 'Delete Failed', message: 'Failed to delete note', buttons: [{ label: 'Dismiss', variant: 'primary', onClick: 'dismiss' }] });
+    }
+  };
+
+  type UnifiedNote = { id: string; type: 'ai' | 'live'; title: string; date: string; data: any };
+  const unifiedNotes: UnifiedNote[] = [
+    ...recordings.map(r => ({ id: `rec_${r.id}`, type: 'live' as const, title: r.title || 'Untitled recording', date: r.completed_at || r.created_at, data: r })),
+    ...aiNotes.map(n => ({ id: `ai_${n.id}`, type: 'ai' as const, title: n.title, date: n.created_at, data: n }))
+  ].sort((a, b) => b.date.localeCompare(a.date))
+   .filter(n => notesFilter === 'all' || n.type === notesFilter);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid #d8dde3',
@@ -274,7 +297,7 @@ export default function LearningZone() {
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#334155', marginTop: '0.15rem' }}>
                   {ev.result_text && <strong>{ev.result_text}</strong>}
-                  {ev.result_file_url && <> &middot; <a href={ev.result_file_url + (ev.result_file_url.includes('?') ? '&' : '?') + 'download=ResultFile'} target="_blank" rel="noopener noreferrer">View file</a></>}
+                  {ev.result_file_url && <> &middot; <a href={ev.result_file_url} target="_blank" rel="noopener noreferrer">View file</a></>}
                 </div>
               </div>
             ))
@@ -282,29 +305,92 @@ export default function LearningZone() {
         </div>
       </div>
 
-      {/* Session Notes (from uploaded recordings / Chommie captures) */}
+      {/* Session Notes (from uploaded recordings / Chommie captures / AI Insights) */}
       <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
-        <div className="content-panel-header" style={{ display: 'block' }}>
-          <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Mic size={20} /> Session Notes</h3>
-          <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>Transcripts and fact-checks from recorded or uploaded sessions.</p>
+        <div className="content-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Mic size={20} /> Session Notes</h3>
+            <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem', marginBottom: 0 }}>Transcripts, fact-checks, and insights from your sessions and materials.</p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#f8fafc', padding: '0.3rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <button
+              onClick={() => setNotesFilter('all')}
+              style={{ border: 'none', background: notesFilter === 'all' ? '#fff' : 'transparent', boxShadow: notesFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', padding: '0.3rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, color: notesFilter === 'all' ? '#334155' : '#64748b', cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              All Notes
+            </button>
+            <button
+              onClick={() => setNotesFilter('live')}
+              style={{ border: 'none', background: notesFilter === 'live' ? '#fff' : 'transparent', boxShadow: notesFilter === 'live' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', padding: '0.3rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, color: notesFilter === 'live' ? '#2563eb' : '#64748b', cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Live Sessions
+            </button>
+            <button
+              onClick={() => setNotesFilter('ai')}
+              style={{ border: 'none', background: notesFilter === 'ai' ? '#fff' : 'transparent', boxShadow: notesFilter === 'ai' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', padding: '0.3rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600, color: notesFilter === 'ai' ? '#7c3aed' : '#64748b', cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              AI Insights
+            </button>
+          </div>
         </div>
         <div className="content-panel-body">
-          {recordings.length === 0 ? (
+          {unifiedNotes.length === 0 ? (
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-              No session notes yet. Upload a recording or use the Chommie extension on your next call — see{' '}
-              <Link to="/dashboard/session-recordings">Session Recordings</Link>.
+              No notes found. Try uploading a recording, using the Chommie extension, or generating an AI Insight.
             </p>
           ) : (
-            recordings.map((rec) => (
-              <div key={rec.id} style={{ padding: '0.7rem 0', borderBottom: '1px solid #f2f4f6' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{rec.title || 'Untitled recording'}</div>
-                <div style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.15rem' }}>
-                  {rec.completed_at ? new Date(rec.completed_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : ''}
-                  {' • '}
-                  <Link to="/dashboard/session-recordings">View notes</Link>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {unifiedNotes.map((note) => (
+                <div key={note.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0.9rem', background: '#f8faff', cursor: note.type === 'ai' ? 'pointer' : 'default' }}
+                    onClick={() => {
+                      if (note.type === 'ai') setExpandedNote(expandedNote === note.id ? null : note.id);
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {note.title}
+                        <span style={{
+                          fontSize: '0.65rem', fontWeight: 700, padding: '0.15rem 0.4rem', borderRadius: '4px',
+                          background: note.type === 'ai' ? '#f5f3ff' : '#eff6ff',
+                          color: note.type === 'ai' ? '#7c3aed' : '#2563eb',
+                          border: `1px solid ${note.type === 'ai' ? '#ddd6fe' : '#bfdbfe'}`
+                        }}>
+                          {note.type === 'ai' ? <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}><Sparkles size={10} /> AI Insight</span> : 'Live Session'}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        {new Date(note.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                      {note.type === 'live' ? (
+                        <Link to="/dashboard/session-recordings" style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563eb', textDecoration: 'none' }}>Open Recording</Link>
+                      ) : (
+                        <>
+                          <span style={{ color: '#7c3aed' }}>{expandedNote === note.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</span>
+                          <button onClick={e => { e.stopPropagation(); handleDeleteAiNote(note.data.id); }} style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}>Delete</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {note.type === 'ai' && expandedNote === note.id && (
+                    <div style={{ padding: '0.9rem', borderTop: '1px solid #e2e8f0', background: 'white' }}>
+                      {note.data.summary && <p style={{ fontSize: '0.85rem', marginBottom: '0.75rem', lineHeight: 1.65, color: '#334155' }}><strong style={{ color: '#5b21b6' }}>Summary:</strong> {note.data.summary}</p>}
+                      {note.data.key_topics && note.data.key_topics.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          {note.data.key_topics.map((t: string, i: number) => (
+                            <span key={i} style={{ display: 'inline-block', padding: '0.2rem 0.6rem', borderRadius: '12px', background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', fontWeight: 600, border: '1px solid #e2e8f0' }}>{t}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>

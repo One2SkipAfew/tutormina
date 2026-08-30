@@ -123,7 +123,7 @@ export function expandAvailability(
     let ranges: TimeRange[] = [];
 
     for (const rule of rules) {
-      if (ruleAppliesToDate(rule, cursor)) {
+      if (rule.is_active && ruleAppliesToDate(rule, cursor)) {
         ranges.push({ start: rule.start_time, end: rule.end_time });
       }
     }

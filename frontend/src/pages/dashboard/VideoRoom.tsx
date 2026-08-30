@@ -12,6 +12,7 @@ import { useRealtimeTranscript } from '../../lib/useRealtimeTranscript';
 import { useFactChecker } from '../../lib/useFactChecker';
 import { generateLiveNotes, summariseSession } from '../../lib/aiApi';
 import { supabase } from '../../lib/supabaseClient';
+import { provisionVideoRoom, getVideoRoomToken, buildRoomUrl } from '../../lib/videoRooms';
 import { useModal } from '../../contexts/NotificationContext';
 import '../../styles/live-session.css';
 
@@ -69,26 +70,59 @@ export default function VideoRoom() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
-  // Daily.co URL input for host
-  const [dailyUrlInput, setDailyUrlInput] = useState('');
-  const [isSavingUrl, setIsSavingUrl] = useState(false);
+  // Automated room provisioning (replaces the old manual "paste your room URL" flow)
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const provisionAttempted = useRef(false);
 
-  const handleSaveDailyUrl = async () => {
-    if (!dailyUrlInput.trim() || !roomId) return;
-    setIsSavingUrl(true);
-    const { error } = await supabase
-      .from('video_rooms')
-      .update({ daily_room_url: dailyUrlInput.trim(), status: 'active' })
-      .eq('id', roomId);
-      
-    if (error) {
-      showModal({ type: 'error', title: 'Error', message: 'Failed to save room URL.' });
-    } else {
-      setRoom(prev => prev ? { ...prev, daily_room_url: dailyUrlInput.trim(), status: 'active' } : prev);
-      showModal({ type: 'success', title: 'Success', message: 'Room URL updated successfully.' });
+  // Signed iframe URL. Rooms are private, so the room URL on its own won't admit anyone —
+  // this holds the URL with a short-lived per-user join token attached.
+  const [joinUrl, setJoinUrl] = useState<string | null>(null);
+  const tokenRequestedFor = useRef<string | null>(null);
+
+  const provisionRoom = useCallback(async () => {
+    if (!room || !room.booking_id || room.daily_room_url || provisionAttempted.current) return;
+    provisionAttempted.current = true;
+    setIsProvisioning(true);
+    try {
+      const vr = await provisionVideoRoom(room.booking_id);
+      setRoom(prev => prev ? { ...prev, daily_room_url: vr.daily_room_url, status: vr.status } : prev);
+    } catch (err) {
+      showModal({
+        type: 'error',
+        title: 'Room Setup Failed',
+        message: err instanceof Error ? err.message : 'Could not set up the video room. Please try again.',
+        buttons: [{ label: 'Retry', variant: 'primary', onClick: () => { provisionAttempted.current = false; provisionRoom(); } }, { label: 'Close', variant: 'outline', onClick: 'dismiss' }],
+      });
+    } finally {
+      setIsProvisioning(false);
     }
-    setIsSavingUrl(false);
-  };
+  }, [room, showModal]);
+
+  useEffect(() => { provisionRoom(); }, [provisionRoom]);
+
+  // Once the room has a URL, exchange it for a signed join URL.
+  useEffect(() => {
+    if (!room?.daily_room_url || !roomId || tokenRequestedFor.current === roomId) return;
+    tokenRequestedFor.current = roomId;
+
+    let cancelled = false;
+    getVideoRoomToken(roomId)
+      .then((token) => {
+        if (!cancelled && room.daily_room_url) setJoinUrl(buildRoomUrl(room.daily_room_url, token));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        tokenRequestedFor.current = null;
+        showModal({
+          type: 'error',
+          title: 'Could Not Join Room',
+          message: err instanceof Error ? err.message : 'We could not get you into the video room.',
+          buttons: [{ label: 'Back to Bookings', variant: 'primary', onClick: () => navigate('/dashboard/bookings') }, { label: 'Close', variant: 'outline', onClick: 'dismiss' }],
+        });
+      });
+
+    return () => { cancelled = true; };
+  }, [room?.daily_room_url, roomId, showModal, navigate]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -138,10 +172,11 @@ export default function VideoRoom() {
       setAiNotes(response.result);
     } catch (err) {
       console.error('AI notes error:', err);
+      showModal({ type: 'error', title: 'AI Notes Failed', message: err instanceof Error ? err.message : 'Could not generate AI notes right now. Please try again.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setIsGeneratingNotes(false);
     }
-  }, [transcript]);
+  }, [transcript, showModal]);
 
   // Run fact check
   const runFactCheck = useCallback(async () => {
@@ -168,6 +203,24 @@ export default function VideoRoom() {
       return;
     }
 
+    // Persist the raw transcript first and independently of the AI call — if the summary
+    // request fails (cold start, rate limit), the session's actual record must still survive.
+    const finalEntries = transcript.transcriptEntries.filter((e) => e.isFinal && e.text.trim());
+    if (roomId && finalEntries.length > 0) {
+      const { error: transcriptError } = await supabase.from('session_transcripts').insert(
+        finalEntries.map((entry) => ({
+          video_room_id: roomId,
+          booking_id: room?.booking_id ?? null,
+          speaker_label: `Speaker ${entry.speaker}`,
+          text: entry.text,
+          start_time: entry.start,
+          end_time: entry.end,
+          is_final: true,
+        }))
+      );
+      if (transcriptError) console.error('Failed to save session transcript:', transcriptError);
+    }
+
     setIsGeneratingSummary(true);
     try {
       const response = await summariseSession({
@@ -192,10 +245,19 @@ export default function VideoRoom() {
       }
     } catch (err) {
       console.error('Summary error:', err);
+      showModal({ type: 'error', title: 'Summary Failed', message: err instanceof Error ? err.message : 'Could not generate the session summary right now.', buttons: [{ label: 'Back to Bookings', variant: 'primary', onClick: () => navigate('/dashboard/bookings') }, { label: 'Close', variant: 'outline', onClick: 'dismiss' }] });
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [transcript, aiNotes, factChecker.results, roomId, room, profile, navigate]);
+  }, [transcript, aiNotes, factChecker.results, roomId, room, profile, navigate, showModal]);
+
+  // Surface fact-checker failures as a modal instead of leaving them silent in the console.
+  useEffect(() => {
+    if (factChecker.error) {
+      showModal({ type: 'error', title: 'Fact Check Failed', message: factChecker.error, buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+      factChecker.clearError();
+    }
+  }, [factChecker.error, factChecker.clearError, showModal]);
 
   // Render markdown
   const renderMarkdown = (md: string): string => {
@@ -256,46 +318,29 @@ export default function VideoRoom() {
         </div>
 
         {/* Daily.co iframe */}
-        {room.daily_room_url ? (
+        {joinUrl ? (
           <iframe
             ref={iframeRef}
-            src={room.daily_room_url}
+            src={joinUrl}
             style={{ flex: 1, border: 'none', background: '#000' }}
             allow="camera; microphone; fullscreen; speaker; display-capture"
             title="Video Conference"
           />
+        ) : room.daily_room_url ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexDirection: 'column', gap: '1rem', background: '#1a1a2e' }}>
+            <div className="spinner" />
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Joining your session…</p>
+          </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexDirection: 'column', gap: '1rem', background: '#1a1a2e' }}>
             <span style={{ fontSize: '3rem' }}>📹</span>
-            <h3 style={{ color: '#e2e8f0', margin: 0 }}>Room Not Ready</h3>
+            <h3 style={{ color: '#e2e8f0', margin: 0 }}>{isProvisioning ? 'Setting Up Your Room...' : 'Room Not Ready'}</h3>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '400px', textAlign: 'center' }}>
-              The video room hasn't been set up with Daily.co yet.
-              {profile?.id !== room.host_id && " Please wait for the host to set up the room."}
+              {isProvisioning
+                ? 'This only takes a moment.'
+                : 'We couldn\'t set up the video room automatically. Please refresh to try again.'}
             </p>
-            {profile?.id === room.host_id && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center', marginTop: '1rem', background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: '12px' }}>
-                <p style={{ fontSize: '0.85rem', color: '#e2e8f0', margin: 0, textAlign: 'center', maxWidth: '350px' }}>
-                  As the host, you need to create a room in your <a href="https://dashboard.daily.co/" target="_blank" rel="noreferrer" style={{ color: '#3b82f6' }}>Daily.co Dashboard</a> and paste the URL here:
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
-                  <input
-                    type="url"
-                    placeholder="https://your-domain.daily.co/room-name"
-                    value={dailyUrlInput}
-                    onChange={(e) => setDailyUrlInput(e.target.value)}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.5)', color: '#fff' }}
-                  />
-                  <button
-                    onClick={handleSaveDailyUrl}
-                    disabled={isSavingUrl || !dailyUrlInput}
-                    className="btn btn-primary"
-                    style={{ padding: '0.5rem 1rem' }}
-                  >
-                    {isSavingUrl ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </div>
-            )}
+            {isProvisioning && <div className="spinner" />}
           </div>
         )}
 

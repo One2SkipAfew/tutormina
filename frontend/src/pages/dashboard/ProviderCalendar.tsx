@@ -10,14 +10,17 @@ import {
   getMyAvailabilityExceptions,
   addAvailabilityRule,
   deleteAvailabilityRule,
+  setActiveAvailabilityRule,
   addAvailabilityException,
   deleteAvailabilityException,
   proposeNewBookingTime,
   updateMeetingLink,
 } from '../../lib/bookings';
 import { getOrCreateConversation } from '../../lib/messaging';
+import { provisionVideoRoom } from '../../lib/videoRooms';
 import { expandAvailability, toDateKey } from '../../lib/availability';
 import { useModal } from '../../contexts/NotificationContext';
+import BookingConfirmationModal from '../../components/dashboard/BookingConfirmationModal';
 
 interface PopulatedBooking extends Booking {
   customer: {
@@ -141,6 +144,8 @@ export default function ProviderCalendar() {
   const [proposedTime, setProposedTime] = useState('09:00');
   const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState('');
+  const [startingSessionFor, setStartingSessionFor] = useState<string | null>(null);
+  const [confirmingBooking, setConfirmingBooking] = useState<PopulatedBooking | null>(null);
 
   const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [exceptions, setExceptions] = useState<AvailabilityException[]>([]);
@@ -154,6 +159,7 @@ export default function ProviderCalendar() {
   const [ruleStart, setRuleStart] = useState('09:00');
   const [ruleEnd, setRuleEnd] = useState('17:00');
   const [repeatUntil, setRepeatUntil] = useState('');
+  const [isAddingRule, setIsAddingRule] = useState(false);
 
   const zone = getZoneColor(profile?.role ?? 'tutor');
   const zoneColor = zone === 'tutor' ? 'var(--zone-tutor)' : 'var(--zone-coach)';
@@ -191,10 +197,12 @@ export default function ProviderCalendar() {
   };
 
   const handleAddRule = async () => {
+    if (isAddingRule) return;
     if (ruleStart >= ruleEnd) {
       showModal({ type: 'error', title: 'Invalid Time', message: 'Start time must be before end time.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
       return;
     }
+    setIsAddingRule(true);
     try {
       if (ruleFrequency === 'one_time') {
         const date = oneTimeDate || toDateKey(selectedDate);
@@ -223,6 +231,19 @@ export default function ProviderCalendar() {
       setSelectedDays([]);
     } catch (err) {
       showModal({ type: 'error', title: 'Add Failed', message: err instanceof Error ? err.message : 'Failed to add availability', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
+    } finally {
+      setIsAddingRule(false);
+    }
+  };
+
+  const handleSetActiveRule = async (id: string) => {
+    const prev = rules;
+    setRules((r) => r.map((rule) => ({ ...rule, is_active: rule.id === id })));
+    try {
+      await setActiveAvailabilityRule(id);
+    } catch (err) {
+      setRules(prev);
+      showModal({ type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Failed to switch availability rule', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
     }
   };
 
@@ -272,18 +293,11 @@ export default function ProviderCalendar() {
     let videoRoomId = booking.video_room_id;
 
     if (status === 'confirmed' && booking.use_video_room && !booking.video_room_id) {
-      const { data: vr, error: vrError } = await supabase
-        .from('video_rooms')
-        .insert({
-          booking_id: booking.id,
-          host_id: profile!.id,
-          room_name: `${booking.customer.first_name}'s Session`,
-        })
-        .select()
-        .single();
-
-      if (!vrError && vr) {
-        videoRoomId = vr.id;
+      try {
+        videoRoomId = (await provisionVideoRoom(booking.id)).id;
+      } catch {
+        // Non-fatal — the booking still confirms. Either party can provision on demand later
+        // via the "Start Session" button, so a transient API hiccup isn't a dead end.
       }
     }
 
@@ -294,6 +308,56 @@ export default function ProviderCalendar() {
 
     if (!error) {
       setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: status as any, video_room_id: videoRoomId } : b));
+
+      if (status === 'confirmed') {
+        try {
+          const aiApiUrl = import.meta.env.VITE_AI_API_URL || 'http://127.0.0.1:8000';
+          const endTime = new Date(new Date(booking.session_date).getTime() + booking.duration_minutes * 60000);
+          await fetch(`${aiApiUrl}/send-booking-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: booking.customer.email,
+              student_name: booking.customer.first_name,
+              provider_name: `${profile!.first_name} ${profile!.last_name}`,
+              date: new Date(booking.session_date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+              time: `${new Date(booking.session_date).toTimeString().slice(0, 5)} – ${endTime.toTimeString().slice(0, 5)}`,
+              duration: `${booking.duration_minutes} minutes`,
+              booking_type: booking.booking_type,
+              login_url: `${window.location.origin}/dashboard/bookings`,
+              stage: 'confirmed',
+            }),
+          });
+          // The student's in-app "booking confirmed" notification is raised by the
+          // on_booking_status_change DB trigger, not from here.
+        } catch {
+          // Non-fatal — the confirmation email is best-effort.
+        }
+      }
+    }
+  };
+
+  // Provisions the room on demand if confirm-time provisioning didn't happen (or failed), so a
+  // confirmed session is never a dead end for either party.
+  const handleStartSession = async (booking: PopulatedBooking) => {
+    if (booking.video_room_id) {
+      navigate(`/dashboard/video-room/${booking.video_room_id}`);
+      return;
+    }
+    setStartingSessionFor(booking.id);
+    try {
+      const room = await provisionVideoRoom(booking.id);
+      setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, video_room_id: room.id } : b));
+      navigate(`/dashboard/video-room/${room.id}`);
+    } catch (err) {
+      showModal({
+        type: 'error',
+        title: 'Could Not Start Session',
+        message: err instanceof Error ? err.message : 'Failed to prepare the video room.',
+        buttons: [{ label: 'Try Again', variant: 'primary', onClick: () => handleStartSession(booking) }, { label: 'Close', variant: 'outline', onClick: 'dismiss' }],
+      });
+    } finally {
+      setStartingSessionFor(null);
     }
   };
 
@@ -359,7 +423,7 @@ export default function ProviderCalendar() {
         <p className="dashboard-page-subtitle">Manage your availability and view your upcoming student sessions.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '1.25rem', alignItems: 'start' }}>
+      <div className="dash-split-panel">
 
         {/* Left column: Month View + Daily Schedule stacked together, sized to their own
             content - independent of whatever height the Availability Manager needs on the
@@ -556,7 +620,7 @@ export default function ProviderCalendar() {
                           <button
                             className="btn btn-primary"
                             style={{ flex: 1, padding: '0.4rem', fontSize: '0.85rem', background: '#34a853', borderColor: '#34a853' }}
-                            onClick={() => updateBookingStatus(booking, 'confirmed')}
+                            onClick={() => setConfirmingBooking(booking)}
                           >
                             Approve
                           </button>
@@ -585,9 +649,14 @@ export default function ProviderCalendar() {
                               📹 Join Video Room
                             </button>
                           ) : (
-                            <div style={{ fontSize: '0.8rem', color: '#b06000', background: '#fef7e0', padding: '0.4rem 0.8rem', borderRadius: '8px', marginBottom: '0.5rem' }}>
-                              Video room is being prepared...
-                            </div>
+                            <button
+                              className="btn btn-primary"
+                              style={{ display: 'block', width: '100%', textAlign: 'center', padding: '0.4rem', fontSize: '0.85rem', marginBottom: '0.5rem', background: 'linear-gradient(135deg, var(--color-primary), var(--color-spring-dark))', border: 'none' }}
+                              disabled={startingSessionFor === booking.id}
+                              onClick={() => handleStartSession(booking)}
+                            >
+                              {startingSessionFor === booking.id ? 'Preparing room...' : '📹 Start Session'}
+                            </button>
                           )
                         ) : booking.meeting_link ? (
                           <a
@@ -727,8 +796,8 @@ export default function ProviderCalendar() {
               </div>
             )}
 
-            <button className="btn btn-primary" style={{ width: '100%', marginBottom: '0.6rem', padding: '0.7rem', fontSize: '0.9rem' }} onClick={handleAddRule}>
-              Add availability
+            <button className="btn btn-primary" style={{ width: '100%', marginBottom: '0.6rem', padding: '0.7rem', fontSize: '0.9rem' }} onClick={handleAddRule} disabled={isAddingRule}>
+              {isAddingRule ? 'Adding...' : 'Add availability'}
             </button>
             <button className="btn btn-outline" style={{ width: '100%', marginBottom: '1.25rem', padding: '0.6rem', fontSize: '0.85rem' }} onClick={handleBlockDate}>
               Block {selectedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} (mark unavailable)
@@ -737,9 +806,23 @@ export default function ProviderCalendar() {
             {rules.length > 0 && (
               <>
                 <div style={availSectionHeaderStyle}>Recurring rules</div>
+                <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '-0.3rem 0 0.5rem' }}>
+                  Only the selected rule is used for your bookable calendar.
+                </p>
                 {rules.map((rule) => (
                   <div key={rule.id} style={availListRowStyle}>
-                    <span>{formatRuleSummary(rule)}</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', flex: 1 }}>
+                      <input
+                        type="radio"
+                        name="active-availability-rule"
+                        checked={rule.is_active}
+                        onChange={() => handleSetActiveRule(rule.id)}
+                        style={{ accentColor: zoneColor, width: '1rem', height: '1rem', flexShrink: 0 }}
+                      />
+                      <span style={{ fontWeight: rule.is_active ? 700 : 400, color: rule.is_active ? '#1e293b' : '#334155' }}>
+                        {formatRuleSummary(rule)}{rule.is_active ? ' (active)' : ''}
+                      </span>
+                    </label>
                     <button onClick={() => handleDeleteRule(rule.id)} style={availDeleteBtnStyle}>&times;</button>
                   </div>
                 ))}
@@ -764,6 +847,17 @@ export default function ProviderCalendar() {
           </div>
         </div>
       </div>
+
+      {confirmingBooking && profile && (
+        <BookingConfirmationModal
+          booking={confirmingBooking}
+          providerId={profile.id}
+          onClose={() => setConfirmingBooking(null)}
+          onConfirm={async (b) => {
+            await updateBookingStatus(b, 'confirmed');
+          }}
+        />
+      )}
     </div>
   );
 }

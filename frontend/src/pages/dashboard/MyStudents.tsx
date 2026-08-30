@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor } from '../../types/lms';
 import { getMyStudents, type MyStudent } from '../../lib/students';
 import { useModal } from '../../contexts/NotificationContext';
+import StudentResourceAccessModal from '../../components/dashboard/StudentResourceAccessModal';
 
 export default function MyStudents() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function MyStudents() {
   const [students, setStudents] = useState<MyStudent[]>([]);
   const [sessionsThisMonth, setSessionsThisMonth] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [accessTarget, setAccessTarget] = useState<MyStudent | null>(null);
   const { showModal } = useModal();
 
   const zoneColor = zone === 'tutor' ? 'var(--zone-tutor)' : zone === 'coach' ? 'var(--zone-coach)' : 'var(--zone-student)';
@@ -123,12 +125,27 @@ export default function MyStudents() {
                       <div>Next: {new Date(s.upcoming_session_date).toLocaleDateString()}</div>
                     )}
                   </div>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => setAccessTarget(s)}
+                  >
+                    Manage access
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {accessTarget && profile && (
+        <StudentResourceAccessModal
+          student={accessTarget}
+          providerId={profile.id}
+          onClose={() => setAccessTarget(null)}
+        />
+      )}
     </div>
   );
 }

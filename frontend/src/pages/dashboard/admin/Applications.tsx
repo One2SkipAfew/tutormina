@@ -129,6 +129,15 @@ export default function Applications() {
                   <li>Phone: {detail.providerDetails?.phone_number ?? '—'}</li>
                   <li>Preferred contact: {detail.providerDetails?.contact_preference ?? '—'}</li>
                   <li>Delivery: {[detail.providerDetails?.offers_virtual && 'Virtual', detail.providerDetails?.offers_in_person && 'In-person'].filter(Boolean).join(', ') || '—'}</li>
+                  <li>Qualifications overview: {detail.providerDetails?.qualifications || '—'}</li>
+                  <li>
+                    Qualifications document:{' '}
+                    {detail.providerDetails?.qualifications_file_url ? (
+                      <a href={detail.providerDetails.qualifications_file_url} target="_blank" rel="noopener noreferrer">
+                        View / Download
+                      </a>
+                    ) : '—'}
+                  </li>
                 </ul>
 
                 <h4>Work history</h4>

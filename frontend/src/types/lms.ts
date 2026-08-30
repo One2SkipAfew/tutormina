@@ -174,6 +174,15 @@ export interface ResourceAlert {
   triggered_by_name?: string;
 }
 
+export interface StudentResourceAccess {
+  id: string;
+  student_id: string;
+  provider_id: string;
+  file_id: string | null;
+  grant_all: boolean;
+  created_at: string;
+}
+
 export interface Booking {
   id: string;
   customer_id: string;
@@ -181,6 +190,7 @@ export interface Booking {
   session_date: string;
   duration_minutes: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'reschedule_proposed';
+  booking_type: 'session' | 'intro_call';
   meeting_link: string | null;
   payment_reference: string | null;
   student_topic: string | null;
@@ -238,6 +248,7 @@ export interface VideoRoom {
   room_name: string;
   daily_room_url: string | null;
   daily_room_name: string | null;
+  provider_daily_room_id: string | null;
   status: VideoRoomStatus;
   started_at: string | null;
   ended_at: string | null;
@@ -316,6 +327,7 @@ export interface AvailabilityRule {
   end_time: string;
   starts_on: string; // date
   ends_on: string | null; // date
+  is_active: boolean;
   created_at: string;
 }
 
@@ -354,7 +366,26 @@ export interface Message {
   sender_name?: string;
 }
 
-export type NotificationType = 'new_message' | 'file_added' | 'file_updated' | 'folder_created' | 'booking_update';
+// Every value the DB notification triggers actually emit. Keep in sync with:
+//   handle_new_message (00009), handle_profile_status_change (00010),
+//   handle_booking_status_change (00012/00017), handle_new_booking_request (00017/00036),
+//   handle_resource_access_granted + handle_direct_file_share (00036).
+export type NotificationType =
+  | 'new_message'
+  | 'file_added'
+  | 'file_updated'
+  | 'folder_created'
+  | 'booking_update'
+  | 'new_booking_request'
+  | 'booking_confirmed'
+  | 'booking_cancelled'
+  | 'booking_reschedule_proposed'
+  | 'application_approved'
+  | 'application_declined'
+  | 'account_suspended'
+  | 'account_blocked'
+  | 'account_deleted'
+  | 'account_reactivated';
 
 export interface Notification {
   id: string;

@@ -8,6 +8,7 @@ import { getStudentDetails, saveStudentDetails, uploadStudentDocument, extractDo
 import { useModal, useToast } from '../../contexts/NotificationContext';
 import '../../styles/vetting.css';
 import '../../styles/messaging.css';
+import { User } from 'lucide-react';
 
 export default function ProfileEditor() {
   const { profile, refreshProfile } = useAuth();
@@ -54,6 +55,8 @@ export default function ProfileEditor() {
   const [extractingAI, setExtractingAI] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [updatingEmail, setUpdatingEmail] = useState(false);
   const { showModal } = useModal();
   const { showToast } = useToast();
 
@@ -173,12 +176,33 @@ export default function ProfileEditor() {
         const { error: updateError } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', profile.id);
         if (updateError) throw updateError;
         setAvatarUrl(url);
-        await refreshProfile();
       }
+      await refreshProfile();
     } catch (err) {
       showModal({ type: 'error', title: 'Upload Failed', message: err instanceof Error ? err.message : 'Failed to upload photo', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    const trimmed = newEmail.trim();
+    if (!trimmed || trimmed === profile?.email) return;
+    setUpdatingEmail(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: trimmed });
+      if (error) throw error;
+      showModal({
+        type: 'success',
+        title: 'Confirm Your New Email',
+        message: `We've sent confirmation links to both ${profile?.email} and ${trimmed}. Your email will only change once you confirm via the link sent to your new address.`,
+        buttons: [{ label: 'Got It', variant: 'primary', onClick: 'dismiss' }],
+      });
+      setNewEmail('');
+    } catch (err) {
+      showModal({ type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Failed to update email', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
+    } finally {
+      setUpdatingEmail(false);
     }
   };
 
@@ -364,7 +388,7 @@ export default function ProfileEditor() {
           <h3 className="content-panel-title">Personal Information</h3>
         </div>
         <div className="content-panel-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '600px' }}>
+          <div className="dash-form-grid" style={{ maxWidth: '600px' }}>
             <div>
               <label style={labelStyle}>First Name</label>
               <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle} />
@@ -377,8 +401,20 @@ export default function ProfileEditor() {
           <div style={{ marginTop: '1rem', maxWidth: '600px' }}>
             <label style={labelStyle}>Email Address</label>
             <input type="email" value={profile?.email ?? ''} disabled style={{ ...inputStyle, background: '#f5f5f5', cursor: 'not-allowed' }} />
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="New email address"
+                style={inputStyle}
+              />
+              <button type="button" className="btn btn-outline btn-sm" style={{ flexShrink: 0 }} onClick={handleUpdateEmail} disabled={updatingEmail || !newEmail.trim()}>
+                {updatingEmail ? 'Sending...' : 'Update Email'}
+              </button>
+            </div>
             <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-              Email cannot be changed here. Contact support if needed.
+              We'll email confirmation links to both addresses — your email only changes once you confirm.
             </p>
           </div>
         </div>
@@ -471,7 +507,7 @@ export default function ProfileEditor() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="dash-form-grid">
                 <div>
                   <label style={labelStyle}>Phone Number</label>
                   <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+27 XX XXX XXXX" style={inputStyle} />
@@ -506,7 +542,7 @@ export default function ProfileEditor() {
               <h3 className="content-panel-title">Rate (optional)</h3>
             </div>
             <div className="content-panel-body" style={{ maxWidth: '600px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="dash-form-grid">
                 <div>
                   <label style={labelStyle}>Amount</label>
                   <input type="number" min={0} step="1" value={rateAmount} onChange={e => setRateAmount(e.target.value)} placeholder="e.g. 350" style={inputStyle} />
@@ -532,7 +568,7 @@ export default function ProfileEditor() {
       {!isProvider && (
         <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
           <div className="content-panel-header">
-            <h3 className="content-panel-title">🎯 About You</h3>
+            <h3 className="content-panel-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={20} /> About You</h3>
           </div>
           <div className="content-panel-body" style={{ maxWidth: '600px' }}>
             <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '1.25rem' }}>
@@ -568,7 +604,7 @@ export default function ProfileEditor() {
 
             {studentType && (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div className="dash-form-grid" style={{ marginBottom: '1rem' }}>
                   <div>
                     <label style={labelStyle}>Age</label>
                     <input type="number" min={0} value={age} onChange={e => setAge(e.target.value)} style={inputStyle} />
@@ -583,7 +619,7 @@ export default function ProfileEditor() {
                   const labels = getStudentTypeLabels(studentType);
                   return (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                      <div className="dash-form-grid" style={{ marginBottom: '1rem' }}>
                         <div>
                           <label style={labelStyle}>{labels.institutionLabel}</label>
                           <input
@@ -676,7 +712,7 @@ export default function ProfileEditor() {
 
                 {studentType === 'professional' && (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="dash-form-grid" style={{ marginBottom: '1rem' }}>
                       <div>
                         <label style={labelStyle}>Occupation</label>
                         <input type="text" value={occupation} onChange={e => setOccupation(e.target.value)} style={inputStyle} />

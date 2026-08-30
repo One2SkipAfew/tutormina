@@ -219,6 +219,12 @@ export async function deleteAvailabilityRule(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Marks one rule active for the current provider; the DB trigger deactivates the rest.
+export async function setActiveAvailabilityRule(id: string): Promise<void> {
+  const { error } = await supabase.from('provider_availability_rules').update({ is_active: true }).eq('id', id);
+  if (error) throw error;
+}
+
 export async function addAvailabilityException(exception: {
   specific_date: string;
   is_available: boolean;
@@ -296,4 +302,23 @@ export async function respondToProposedTime(bookingId: string, accept: boolean):
     const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
     if (error) throw error;
   }
+}
+
+export async function getPendingBookingsCount(): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  
+  // Bookings are created with status 'pending' (see BookingCalendarModal) — 'requested' is not
+  // a status this app ever writes, so filtering on it always returned 0 and the badge never showed.
+  const { count, error } = await supabase
+    .from('bookings')
+    .select('*', { count: 'exact', head: true })
+    .eq('provider_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('Error fetching pending bookings count:', error);
+    return 0;
+  }
+  return count ?? 0;
 }

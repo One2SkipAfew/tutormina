@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getFolders, getFiles } from '../../lib/sharedDrive';
+import { getFolders, getFiles, downloadFile } from '../../lib/sharedDrive';
 import { getSessionNotes } from '../../lib/aiNotes';
 import { getZoneColor, formatFileSize } from '../../types/lms';
 import type { Folder, SharedFile, FileType } from '../../types/lms';
-import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic, Monitor, Search, Loader, Folder as FolderIcon, GraduationCap, Users, BookMarked, Sparkles, Download, Paperclip } from 'lucide-react';
+import { ClipboardList, FileText, Film, Edit3, Book, BookOpen, Mic, Monitor, Search, Loader, Folder as FolderIcon, GraduationCap, Users, BookMarked, Sparkles, Download, Paperclip, Eye } from 'lucide-react';
+import ResourceViewerModal from '../../components/dashboard/ResourceViewerModal';
 import '../../styles/shared-drive.css';
 
 const getIconForFileType = (type: FileType | string, size = 24) => {
@@ -44,6 +45,7 @@ export default function SharedDrive() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FileType | ''>('');
   const [selectedFile, setSelectedFile] = useState<SharedFile | null>(null);
+  const [viewingFile, setViewingFile] = useState<SharedFile | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -72,7 +74,9 @@ export default function SharedDrive() {
         const [folderData, fileData] = await Promise.all([
           getFolders(currentFolderId, undefined, activeFilter || undefined),
           getFiles({
-            folderId: currentFolderId,
+            // Only filter by folder when we're actually inside one.
+            // At root (null), show ALL accessible files regardless of folder nesting.
+            folderId: currentFolderId ?? undefined,
             fileType: activeFilter || undefined,
             search: searchQuery || undefined,
           }),
@@ -295,7 +299,7 @@ export default function SharedDrive() {
                 </div>
               )}
 
-              {/* AI Summary */}
+              {/* AI Summary or View Action */}
               {selectedFile.ai_summary ? (
                 <div className="ai-panel">
                   <div className="ai-panel-header">
@@ -313,8 +317,21 @@ export default function SharedDrive() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Sparkles size={14} /> Summarise</button>
-                  <button className="ai-action-btn" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Search size={14} /> Extract Topics</button>
+                  <button
+                    className="btn btn-primary"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem',
+                      padding: '0.55rem 1.25rem', fontSize: '0.88rem',
+                      background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                      borderColor: '#0284c7', color: '#ffffff', fontWeight: 600,
+                    }}
+                    onClick={() => {
+                      setViewingFile(selectedFile);
+                      setSelectedFile(null);
+                    }}
+                  >
+                    <Eye size={16} /> View Resource
+                  </button>
                 </div>
               )}
 
@@ -330,26 +347,55 @@ export default function SharedDrive() {
                 </div>
               )}
             </div>
-            <div className="upload-modal-footer">
+            <div className="upload-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-outline"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                onClick={() => {
+                  setViewingFile(selectedFile);
+                  setSelectedFile(null);
+                }}
+              >
+                <Eye size={16} /> Open in Viewer
+              </button>
+
               {selectedFile.file_url && (
-                <a
-                  href={selectedFile.file_url + (selectedFile.file_url.includes('?') ? '&' : '?') + 'download=' + encodeURIComponent(selectedFile.title)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
                   className="btn btn-primary"
                   style={{
                     padding: '0.5rem 1.25rem', fontSize: '0.85rem',
                     background: zone === 'tutor' ? 'var(--zone-tutor)' : zone === 'coach' ? 'var(--zone-coach)' : 'var(--zone-student)',
-                    textDecoration: 'none',
-                    display: 'flex', alignItems: 'center', gap: '0.4rem'
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    cursor: 'pointer', border: 'none',
+                  }}
+                  onClick={async () => {
+                    try {
+                      await downloadFile(selectedFile);
+                    } catch (err) {
+                      console.error('Download failed:', err);
+                      // Fallback: open in new tab
+                      window.open(selectedFile.file_url!, '_blank');
+                    }
                   }}
                 >
                   <Download size={16} /> Download
-                </a>
+                </button>
               )}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full Resource Viewer Window */}
+      {viewingFile && (
+        <ResourceViewerModal
+          file={viewingFile}
+          onClose={() => setViewingFile(null)}
+          onFileUpdated={(updated) => {
+            setFiles(prev => prev.map(f => f.id === updated.id ? updated : f));
+            setViewingFile(updated);
+          }}
+        />
       )}
     </div>
   );

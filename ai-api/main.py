@@ -8,6 +8,7 @@ Production URL: https://<username>-tutormina-ai.hf.space
 
 import os
 import io
+import re
 import asyncio
 import json
 import logging
@@ -15,6 +16,7 @@ import tempfile
 import base64
 import smtplib
 from email.mime.text import MIMEText
+import websockets
 try:
     import resend
 except ImportError:
@@ -28,6 +30,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
+from starlette.background import BackgroundTask
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -60,10 +63,18 @@ else:
 # Core credentials
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY", "")
+ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY", "")
+
+try:
+    import assemblyai as aai
+    if ASSEMBLYAI_API_KEY:
+        aai.settings.api_key = ASSEMBLYAI_API_KEY
+except ImportError:
+    aai = None
 
 # Groq model IDs — kept as env-overridable constants since Groq rotates/deprecates
 # preview models fairly often; check console.groq.com/docs/models if one stops working.
-GROQ_TEXT_MODEL = os.getenv("GROQ_TEXT_MODEL", "llama-3.3-70b-versatile")
+GROQ_TEXT_MODEL = os.getenv("GROQ_TEXT_MODEL", "qwen/qwen3.8-27b")
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
 GROQ_STT_MODEL = os.getenv("GROQ_STT_MODEL", "whisper-large-v3")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -81,17 +92,31 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 if RESEND_API_KEY and resend:
     resend.api_key = RESEND_API_KEY
 
-# Origins
+# Origins — if you add/change the production domain, update ALLOWED_ORIGINS in ai-api's
+# deployment env (Hugging Face Space secrets) rather than relying on this fallback list.
 ALLOWED_ORIGINS = [
     o.strip()
     for o in os.getenv(
         "ALLOWED_ORIGINS",
-        "http://localhost:5173,http://localhost:3000,https://tutormina.netlify.app",
+        "http://localhost:5173,http://localhost:3000,https://tutormina.netlify.app,https://tutormina.africa,https://www.tutormina.africa",
     ).split(",")
     if o.strip()
 ]
 
 MAX_LIVESTREAM_SECONDS = int(os.getenv("MAX_LIVESTREAM_SECONDS", "5400"))
+
+# Upper bound on a single text-to-speech request. Generation time and output size scale with
+# input length, and this runs on a small shared container — an unbounded request can pin the
+# worker and fill the disk.
+MAX_TTS_CHARS = int(os.getenv("MAX_TTS_CHARS", "20000"))
+
+# Daily.co (video room automation)
+# DAILYCO_API_KEY is the name this project has always used; DAILY_API_KEY is accepted as an
+# alias so either spelling works and a rename can't silently disable video rooms.
+DAILY_API_KEY = os.getenv("DAILYCO_API_KEY", "") or os.getenv("DAILY_API_KEY", "")
+
+# Cron (Supabase pg_cron -> POST /cron/tick, see 00030_booking_reminders_cron.sql)
+CRON_SECRET = os.getenv("CRON_SECRET", "")
 
 # ---------------------------------------------------------------------------
 # Client Initialisation
@@ -105,14 +130,11 @@ if GROQ_API_KEY:
     except Exception as exc:
         logger.error("Failed to initialise Groq client: %s", exc)
 
-deepgram_client = None
+# Deepgram is used via direct WebSocket proxy (websockets lib) — no SDK import needed.
+# deepgram_client is kept as a truthy value if key exists so legacy checks still pass.
+deepgram_client = bool(DEEPGRAM_API_KEY)
 if DEEPGRAM_API_KEY:
-    try:
-        from deepgram import DeepgramClient
-        deepgram_client = DeepgramClient(DEEPGRAM_API_KEY)
-        logger.info("Deepgram client initialised.")
-    except Exception as exc:
-        logger.error("Failed to initialise Deepgram client: %s", exc)
+    logger.info("Deepgram API key configured — using websockets proxy for live transcription.")
 
 supabase = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
@@ -162,8 +184,45 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 # AI Helpers
 # ---------------------------------------------------------------------------
 
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_ORPHAN_THINK_RE = re.compile(r"^.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _remove_file(path: str) -> None:
+    """Best-effort cleanup of a temp file once its response has been sent."""
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError as exc:
+        logger.warning("Could not remove temp file %s: %s", path, exc)
+
+
+def _strip_reasoning(text: Optional[str]) -> str:
+    """Remove <think>…</think> chain-of-thought blocks from model output.
+
+    The Qwen3 models expose their reasoning inline. That text is internal scratch work — it must
+    never reach a student or professional (it leaks prompt details and reads as gibberish), and
+    it breaks json.loads() on the endpoints that ask for a JSON-only reply. An unterminated
+    opening tag means the reply hit max_tokens mid-thought, so there's no usable answer left.
+    """
+    if not text:
+        return ""
+
+    cleaned = _THINK_BLOCK_RE.sub("", text)
+    # A stray closing tag means the opener was consumed above or never emitted — drop everything
+    # up to and including it, leaving only the actual answer.
+    if "</think>" in cleaned:
+        cleaned = _ORPHAN_THINK_RE.sub("", cleaned)
+    # An opener with no closer means the reply was truncated mid-reasoning, so everything from
+    # that point on is scratch work with no answer after it.
+    opener = cleaned.lower().find("<think>")
+    if opener != -1:
+        cleaned = cleaned[:opener]
+    return cleaned.strip()
+
+
 async def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
-    """Call Groq's chat completions API (Llama 3.3 70B) for text generation."""
+    """Call Groq's chat completions API for text generation."""
     if not groq_client:
         raise HTTPException(
             status_code=503,
@@ -180,7 +239,7 @@ async def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 409
         max_tokens=max_tokens,
         temperature=0.3,
     )
-    return response.choices[0].message.content
+    return _strip_reasoning(response.choices[0].message.content)
 
 
 async def _transcribe_with_groq(file_bytes: bytes, filename: str) -> str:
@@ -197,8 +256,33 @@ async def _transcribe_with_groq(file_bytes: bytes, filename: str) -> str:
         file=(filename or "audio.webm", file_bytes),
         model=GROQ_STT_MODEL,
         response_format="text",
+        timeout=120.0,
     )
     return response if isinstance(response, str) else response.text
+
+
+async def _transcribe_with_assemblyai(file_bytes: bytes) -> str:
+    """Transcribe audio (including very large files) using AssemblyAI."""
+    if not ASSEMBLYAI_API_KEY or not aai:
+        raise RuntimeError("AssemblyAI API Key not configured or package not installed")
+
+    fd, temp_path = tempfile.mkstemp(suffix=".webm")
+    os.write(fd, file_bytes)
+    os.close(fd)
+
+    try:
+        def do_transcribe():
+            transcriber = aai.Transcriber()
+            transcript = transcriber.transcribe(temp_path)
+            if transcript.status == aai.TranscriptStatus.error:
+                raise Exception(transcript.error)
+            return transcript.text
+
+        text = await asyncio.to_thread(do_transcribe)
+        return text
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 CHUNK_WORD_LIMIT = int(os.getenv("CHUNK_WORD_LIMIT", "5000"))
@@ -317,6 +401,12 @@ class BookingEmailInput(BaseModel):
     topic: Optional[str] = None
     booking_type: Optional[str] = "session"
     login_url: str     # e.g. "https://tutormina.netlify.app/dashboard/bookings"
+    audience: Optional[str] = "student"   # "student" | "professional" — who this email is addressed to
+    stage: Optional[str] = "requested"    # "requested" | "confirmed" — where the booking is in its lifecycle
+
+
+class CronTickResult(BaseModel):
+    reminders_sent: int
 
 
 class SessionSummaryRequest(BaseModel):
@@ -330,6 +420,13 @@ class SessionSummaryRequest(BaseModel):
 class LivestreamAINotesRequest(BaseModel):
     transcript: str
     context: Optional[dict] = None
+
+
+class ContactEmailInput(BaseModel):
+    name: str
+    email: str
+    subject: str
+    message: str
 
 
 # ---------------------------------------------------------------------------
@@ -488,6 +585,39 @@ async def generate_insights(input: TextInput):
         raise HTTPException(status_code=503, detail=f"AI service error: {exc}")
 
 
+
+# ---- Generate Insights ----
+
+@app.post("/generate-insights", response_model=InsightsResponse)
+async def generate_insights(input: TextInput):
+    """Analyse text and generate educational insights."""
+    system_prompt = (
+        "You are an expert educational analyst. Analyse the provided content and generate insights. "
+        "Return a JSON object with:\n"
+        '  "summary": a concise analysis summary\n'
+        '  "insights": an array of 4-6 actionable insights\n'
+        '  "key_topics": an array of key topics\n'
+        "Return ONLY the JSON object."
+    )
+
+    try:
+        result = await _call_groq_chunked(system_prompt, input.text)
+        result = result.strip()
+        if result.startswith("```"):
+            result = result.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        data = json.loads(result)
+        return InsightsResponse(
+            summary=data.get("summary", ""),
+            insights=data.get("insights", []),
+            key_topics=data.get("key_topics", []),
+        )
+    except json.JSONDecodeError:
+        return InsightsResponse(summary=result, insights=[], key_topics=[])
+    except Exception as exc:
+        logger.exception("Insights generation error")
+        raise HTTPException(status_code=503, detail=f"AI service error: {exc}")
+
+
 # ---- PDF Parsing ----
 
 def _extract_pdf_text(file_bytes: bytes) -> str:
@@ -575,7 +705,7 @@ async def extract_image_text(file: UploadFile = File(...)):
         )
         return {
             "filename": file.filename,
-            "extracted_text": response.choices[0].message.content,
+            "extracted_text": _strip_reasoning(response.choices[0].message.content),
             "mime_type": mime_type,
         }
     except Exception as exc:
@@ -639,8 +769,20 @@ async def scrape_url(request: ScrapeRequest):
 
 @app.post("/speech-to-text")
 async def speech_to_text(file: UploadFile = File(...)):
-    """Transcribe audio using Groq's Whisper Large v3, falling back to Deepgram."""
+    """Transcribe audio using AssemblyAI for large files, falling back to Groq."""
     file_bytes = await file.read()
+
+    if ASSEMBLYAI_API_KEY and aai:
+        try:
+            transcript = await _transcribe_with_assemblyai(file_bytes)
+            return {
+                "transcript": transcript,
+                "method": "assemblyai",
+                "filename": file.filename,
+            }
+        except Exception as exc:
+            logger.exception("AssemblyAI STT failed")
+            # Fall back to Groq if AssemblyAI fails
 
     if groq_client:
         try:
@@ -651,41 +793,8 @@ async def speech_to_text(file: UploadFile = File(...)):
                 "filename": file.filename,
             }
         except Exception as exc:
-            logger.warning("Groq STT failed, trying Deepgram: %s", exc)
-
-    # Fallback: Deepgram
-    if deepgram_client:
-        from deepgram import PrerecordedOptions
-        import httpx as hx
-
-        try:
-            options = PrerecordedOptions(
-                model="nova-2",
-                smart_format=True,
-                diarize=True,
-                punctuate=True,
-            )
-            payload = {"buffer": file_bytes}
-            response = await asyncio.to_thread(
-                deepgram_client.listen.prerecorded.v("1").transcribe_file,
-                payload,
-                options,
-                timeout=hx.Timeout(300.0, connect=30.0),
-            )
-            response_dict = response.to_dict() if hasattr(response, "to_dict") else response
-            channels = response_dict.get("results", {}).get("channels", [])
-            transcript = ""
-            if channels:
-                alts = channels[0].get("alternatives", [])
-                if alts:
-                    transcript = alts[0].get("transcript", "")
-            return {
-                "transcript": transcript,
-                "method": "deepgram",
-                "filename": file.filename,
-            }
-        except Exception as exc:
-            logger.warning("Deepgram STT failed: %s", exc)
+            logger.exception("Groq STT failed")
+            raise HTTPException(status_code=503, detail=f"Transcription failed: {exc}")
 
     raise HTTPException(status_code=503, detail="No transcription service available.")
 
@@ -698,6 +807,12 @@ async def text_to_speech(payload: TTSRequest):
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Text is empty.")
 
+    if len(payload.text) > MAX_TTS_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Text is too long for audio generation (max {MAX_TTS_CHARS:,} characters).",
+        )
+
     import edge_tts
 
     fd, temp_path = tempfile.mkstemp(suffix=".mp3")
@@ -706,12 +821,16 @@ async def text_to_speech(payload: TTSRequest):
     try:
         communicate = edge_tts.Communicate(payload.text, payload.voice)
         await communicate.save(temp_path)
+        # Delete once the response has been streamed. Without this the container's ephemeral
+        # disk fills up over time, since every request leaves an .mp3 behind permanently.
         return FileResponse(
             path=temp_path,
             media_type="audio/mpeg",
             filename="tutormina_speech.mp3",
+            background=BackgroundTask(_remove_file, temp_path),
         )
     except Exception as exc:
+        _remove_file(temp_path)
         logger.exception("TTS generation failed")
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {exc}")
 
@@ -724,14 +843,20 @@ async def process_audio(file: UploadFile = File(...), user=Depends(get_current_u
     file_bytes = await file.read()
 
     transcript_result = ""
-    if groq_client:
+    if ASSEMBLYAI_API_KEY and aai:
+        try:
+            transcript_result = await _transcribe_with_assemblyai(file_bytes)
+        except Exception as exc:
+            logger.warning("AssemblyAI audio processing failed: %s", exc)
+
+    if not transcript_result and groq_client:
         try:
             transcript_result = await _transcribe_with_groq(file_bytes, file.filename)
         except Exception as exc:
             logger.warning("Groq audio processing failed: %s", exc)
 
     if not transcript_result:
-        transcript_result = "[Transcription unavailable — configure GROQ_API_KEY]"
+        transcript_result = "[Transcription unavailable — configure ASSEMBLYAI_API_KEY or GROQ_API_KEY]"
 
     # Then summarise the transcript
     summary = ""
@@ -998,148 +1123,286 @@ async def generate_livestream_notes(payload: LivestreamAINotesRequest):
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable.")
 
 
-# ---- LiveStream WebSocket (Real-Time Transcription via Deepgram) ----
 
-@app.websocket("/ws/livestream")
-async def livestream_websocket(websocket: WebSocket):
-    """WebSocket endpoint for real-time audio transcription via Deepgram.
 
-    Protocol:
-    - Client sends binary audio chunks (PCM from browser AudioContext)
-    - Server streams back JSON messages:
-      {"type": "transcript", "is_final": bool, "text": str, "speaker": int}
-      {"type": "status", "message": str}
-      {"type": "error", "message": str}
+
+# ---- Video Room Provisioning (Daily.co) ----
+
+class VideoRoomProvisionRequest(BaseModel):
+    booking_id: str
+
+
+class VideoRoomTokenRequest(BaseModel):
+    video_room_id: str
+
+
+# How long a join token stays valid. Long enough to cover an over-running session, short enough
+# that a leaked link dies quickly.
+MEETING_TOKEN_TTL_SECONDS = int(os.getenv("MEETING_TOKEN_TTL_SECONDS", "14400"))  # 4 hours
+
+
+async def _create_daily_room() -> dict:
+    """Create a persistent private Daily.co room via the REST API.
+
+    Rooms are private because they're pooled and reused across bookings: a public room URL,
+    once seen, would let a past participant walk into a later session with a different student.
+    Joining therefore requires a short-lived per-user meeting token (see _create_meeting_token).
     """
-    await websocket.accept()
-    logger.info("LiveStream WebSocket connected")
+    if not DAILY_API_KEY:
+        raise HTTPException(status_code=503, detail="Video rooms are not configured. Set DAILYCO_API_KEY.")
 
-    if not deepgram_client:
-        await websocket.send_json({
-            "type": "error",
-            "message": "Real-time transcription not configured. Set DEEPGRAM_API_KEY.",
-        })
-        await websocket.close()
-        return
+    import httpx
 
-    from deepgram import LiveOptions, LiveTranscriptionEvents
-
-    dg_connection = None
-    is_closing = False
-
-    try:
-        dg_connection = deepgram_client.listen.asyncwebsocket.v("1")
-
-        async def on_message(self, result, **kwargs):
-            try:
-                channel = result.channel
-                if channel and channel.alternatives and len(channel.alternatives) > 0:
-                    alt = channel.alternatives[0]
-                    transcript_text = alt.transcript
-                    if transcript_text.strip():
-                        speaker = 0
-                        if alt.words and len(alt.words) > 0:
-                            speaker = getattr(alt.words[0], "speaker", 0) or 0
-
-                        msg = {
-                            "type": "transcript",
-                            "is_final": result.is_final,
-                            "text": transcript_text,
-                            "speaker": speaker,
-                            "start": getattr(result, "start", 0.0),
-                            "end": getattr(result, "start", 0.0) + getattr(result, "duration", 0.0),
-                            "speech_final": getattr(result, "speech_final", False),
-                        }
-                        if not is_closing:
-                            await websocket.send_json(msg)
-            except Exception as e:
-                logger.warning("Error sending transcript: %s", e)
-
-        async def on_error(self, error, **kwargs):
-            logger.error("Deepgram error: %s", error)
-            try:
-                if not is_closing:
-                    await websocket.send_json({"type": "error", "message": str(error)})
-            except Exception:
-                pass
-
-        async def on_close(self, close, **kwargs):
-            logger.info("Deepgram connection closed")
-
-        async def on_open(self, open, **kwargs):
-            logger.info("Deepgram connection opened")
-            try:
-                if not is_closing:
-                    await websocket.send_json({"type": "status", "message": "Connected. Listening..."})
-            except Exception:
-                pass
-
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
-        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
-        dg_connection.on(LiveTranscriptionEvents.Open, on_open)
-
-        options = LiveOptions(
-            model="nova-2",
-            language="en",
-            smart_format=True,
-            punctuate=True,
-            diarize=True,
-            interim_results=True,
-            utterance_end_ms="1500",
-            vad_events=True,
-            encoding="linear16",
-            sample_rate=16000,
-            channels=1,
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            "https://api.daily.co/v1/rooms",
+            headers={"Authorization": f"Bearer {DAILY_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "privacy": "private",
+                "properties": {
+                    "enable_screenshare": True,
+                    "enable_chat": True,
+                    # Nobody gets in without a token, even if they somehow have the URL.
+                    "enable_knocking": False,
+                },
+            },
         )
+        if resp.status_code >= 400:
+            logger.error("Daily.co room creation failed: %s %s", resp.status_code, resp.text)
+            raise HTTPException(status_code=502, detail="Could not create a video room right now.")
+        return resp.json()
 
-        started = await dg_connection.start(options)
-        if not started:
-            await websocket.send_json({"type": "error", "message": "Failed to start transcription."})
-            await websocket.close()
-            return
 
-        await websocket.send_json({"type": "status", "message": "Ready to receive audio."})
+async def _create_meeting_token(room_name: str, user_name: str, is_owner: bool) -> str:
+    """Mint a short-lived join token scoped to one room and one person.
 
-        while True:
-            try:
-                data = await websocket.receive()
-                if "bytes" in data:
-                    await dg_connection.send(data["bytes"])
-                elif "text" in data:
-                    try:
-                        control = json.loads(data["text"])
-                        if control.get("type") == "stop":
-                            logger.info("Client requested stop")
-                            break
-                    except json.JSONDecodeError:
-                        pass
-            except WebSocketDisconnect:
-                logger.info("WebSocket disconnected")
-                break
-            except Exception as recv_err:
-                logger.warning("WebSocket receive error: %s", recv_err)
-                break
+    The token — not the room URL — is what actually grants entry, so access ends when the token
+    expires rather than persisting for anyone who ever saw the link.
+    """
+    if not DAILY_API_KEY:
+        raise HTTPException(status_code=503, detail="Video rooms are not configured. Set DAILYCO_API_KEY.")
 
-    except Exception as exc:
-        logger.exception("LiveStream WebSocket error")
+    import time
+    import httpx
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(
+            "https://api.daily.co/v1/meeting-tokens",
+            headers={"Authorization": f"Bearer {DAILY_API_KEY}", "Content-Type": "application/json"},
+            json={
+                "properties": {
+                    "room_name": room_name,
+                    "user_name": user_name,
+                    "is_owner": is_owner,
+                    "exp": int(time.time()) + MEETING_TOKEN_TTL_SECONDS,
+                }
+            },
+        )
+        if resp.status_code >= 400:
+            logger.error("Daily.co token creation failed: %s %s", resp.status_code, resp.text)
+            raise HTTPException(status_code=502, detail="Could not prepare access to the video room.")
+        return resp.json()["token"]
+
+
+@app.post("/video-rooms/token")
+async def create_video_room_token(payload: VideoRoomTokenRequest, user=Depends(get_current_user)):
+    """Issue a join token for a room, but only to the two people on that booking."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    room_res = (
+        supabase.table("video_rooms")
+        .select("id, host_id, booking_id, daily_room_name, status")
+        .eq("id", payload.video_room_id)
+        .single()
+        .execute()
+    )
+    room = room_res.data
+    if not room:
+        raise HTTPException(status_code=404, detail="Video room not found.")
+    if room.get("status") == "ended":
+        raise HTTPException(status_code=409, detail="This session has already ended.")
+    if not room.get("daily_room_name"):
+        raise HTTPException(status_code=409, detail="This video room isn't ready yet.")
+
+    # Authorise against the booking, not the room: pooled rooms outlive any single session, so
+    # "was on a booking that used this room once" must never be enough to get back in.
+    is_host = user.id == room["host_id"]
+    is_participant = is_host
+    if not is_participant and room.get("booking_id"):
+        booking_res = (
+            supabase.table("bookings")
+            .select("customer_id, provider_id")
+            .eq("id", room["booking_id"])
+            .single()
+            .execute()
+        )
+        booking = booking_res.data
+        is_participant = bool(booking) and user.id in (booking["customer_id"], booking["provider_id"])
+
+    if not is_participant:
+        raise HTTPException(status_code=403, detail="You don't have access to this session.")
+
+    profile_res = supabase.table("profiles").select("first_name, last_name").eq("id", user.id).single().execute()
+    profile = profile_res.data or {}
+    user_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip() or "Participant"
+
+    token = await _create_meeting_token(room["daily_room_name"], user_name, is_owner=is_host)
+    return {"token": token}
+
+
+@app.post("/video-rooms/provision")
+async def provision_video_room(payload: VideoRoomProvisionRequest, user=Depends(get_current_user)):
+    """Attach a reusable Daily.co room to a booking, pulling from (or growing, up to 3) the
+    professional's room pool, instead of the host manually creating one per session."""
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Database not configured.")
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+
+    booking_res = supabase.table("bookings").select("id, provider_id, customer_id, video_room_id").eq("id", payload.booking_id).single().execute()
+    booking = booking_res.data
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+    if user.id not in (booking["provider_id"], booking["customer_id"]):
+        raise HTTPException(status_code=403, detail="Not a participant in this booking.")
+
+    # Already provisioned — idempotent, just return the existing room.
+    if booking.get("video_room_id"):
+        existing = supabase.table("video_rooms").select("*").eq("id", booking["video_room_id"]).single().execute()
+        if existing.data:
+            return existing.data
+
+    provider_id = booking["provider_id"]
+
+    # 1. Find an available pooled room for this provider.
+    pool_res = (
+        supabase.table("provider_daily_rooms")
+        .select("*")
+        .eq("provider_id", provider_id)
+        .eq("status", "available")
+        .limit(1)
+        .execute()
+    )
+    pooled_room = pool_res.data[0] if pool_res.data else None
+
+    # 2. None free — grow the pool (up to 3) by creating a new Daily room.
+    if not pooled_room:
+        count_res = supabase.table("provider_daily_rooms").select("id", count="exact").eq("provider_id", provider_id).execute()
+        pool_size = count_res.count or 0
+        if pool_size >= 3:
+            raise HTTPException(status_code=409, detail="All your video rooms are currently in use. Please try again shortly.")
+
+        daily_room = await _create_daily_room()
+        insert_res = (
+            supabase.table("provider_daily_rooms")
+            .insert({
+                "provider_id": provider_id,
+                "daily_room_name": daily_room["name"],
+                "daily_room_url": daily_room["url"],
+                "status": "in_use",
+            })
+            .select()
+            .single()
+            .execute()
+        )
+        pooled_room = insert_res.data
+    else:
+        supabase.table("provider_daily_rooms").update({"status": "in_use"}).eq("id", pooled_room["id"]).execute()
+
+    # 3. Create the per-booking video_rooms row, backed by the pooled Daily resource.
+    customer_res = supabase.table("profiles").select("first_name").eq("id", booking["customer_id"]).single().execute()
+    customer_name = (customer_res.data or {}).get("first_name", "Student")
+
+    vr_res = (
+        supabase.table("video_rooms")
+        .insert({
+            "booking_id": booking["id"],
+            "host_id": provider_id,
+            "room_name": f"{customer_name}'s Session",
+            "daily_room_url": pooled_room["daily_room_url"],
+            "daily_room_name": pooled_room["daily_room_name"],
+            "provider_daily_room_id": pooled_room["id"],
+            "status": "waiting",
+        })
+        .select()
+        .single()
+        .execute()
+    )
+    video_room = vr_res.data
+
+    supabase.table("bookings").update({"video_room_id": video_room["id"]}).eq("id", booking["id"]).execute()
+
+    return video_room
+
+
+# ---- Cron (Supabase pg_cron -> /cron/tick, every ~10 min) ----
+
+@app.post("/cron/tick", response_model=CronTickResult)
+async def cron_tick(request: Request):
+    """Keeps this Space warm (fixing the cold-start "failed to fetch" AI errors) and sends
+    upcoming-session reminder emails. Called by Supabase pg_cron — see
+    00030_booking_reminders_cron.sql."""
+    if not CRON_SECRET or request.headers.get("X-Cron-Secret") != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid cron secret.")
+
+    if not supabase:
+        return CronTickResult(reminders_sent=0)
+
+    now = datetime.now(timezone.utc)
+    window_end = now.timestamp() + 3600  # bookings starting in the next 60 minutes
+
+    due = (
+        supabase.table("bookings")
+        .select("id, session_date, duration_minutes, booking_type, customer_id, provider_id, "
+                "customer:profiles!bookings_customer_id_fkey(first_name, email), "
+                "provider:profiles!bookings_provider_id_fkey(first_name, last_name)")
+        .eq("status", "confirmed")
+        .is_("reminder_sent_at", "null")
+        .gte("session_date", now.isoformat())
+        .lte("session_date", datetime.fromtimestamp(window_end, tz=timezone.utc).isoformat())
+        .execute()
+    )
+
+    sent = 0
+    for booking in due.data or []:
+        customer = booking.get("customer") or {}
+        provider = booking.get("provider") or {}
+        if not customer.get("email"):
+            continue
+
+        session_dt = datetime.fromisoformat(booking["session_date"].replace("Z", "+00:00"))
+        input_data = BookingEmailInput(
+            to=customer["email"],
+            student_name=customer.get("first_name", "there"),
+            provider_name=f"{provider.get('first_name', '')} {provider.get('last_name', '')}".strip(),
+            date=session_dt.strftime("%A, %d %B %Y"),
+            time=session_dt.strftime("%H:%M"),
+            duration=f"{booking['duration_minutes']} minutes",
+            booking_type=booking.get("booking_type", "session"),
+            login_url="https://tutormina.africa/dashboard/bookings",
+            stage="reminder",
+        )
+        html = _build_booking_email_html(input_data)
+        subject = "⏰ Reminder: your session is coming up"
         try:
-            if not is_closing:
-                await websocket.send_json({"type": "error", "message": str(exc)})
+            if RESEND_API_KEY and resend:
+                resend.Emails.send({"from": EMAIL_FROM, "to": input_data.to, "subject": subject, "html": html})
+            else:
+                message = MIMEText(html, "html")
+                message["Subject"] = subject
+                message["From"] = EMAIL_FROM
+                message["To"] = input_data.to
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+                    server.send_message(message)
+            supabase.table("bookings").update({"reminder_sent_at": now.isoformat()}).eq("id", booking["id"]).execute()
+            sent += 1
         except Exception:
-            pass
-    finally:
-        is_closing = True
-        if dg_connection:
-            try:
-                await dg_connection.finish()
-            except Exception:
-                pass
-        try:
-            await websocket.close()
-        except Exception:
-            pass
-        logger.info("LiveStream WebSocket cleanup complete")
+            logger.exception("Failed to send reminder email for booking %s", booking["id"])
+
+    return CronTickResult(reminders_sent=sent)
 
 
 # ---- Email (Existing feature) ----
@@ -1174,20 +1437,53 @@ async def send_application_email(input: ApplicationEmailInput):
 # ---- Booking Confirmation Email ----
 
 def _build_booking_email_html(data: BookingEmailInput) -> str:
-    """Build a branded, responsive HTML email for booking confirmations."""
-    is_intro = data.booking_type == "intro_call"
-    heading = "Intro Call Confirmed!" if is_intro else "Session Booking Confirmed!"
-    emoji = "☕" if is_intro else "🎉"
+    """Build a branded, responsive HTML email for booking-related notifications.
 
-    # Provider avatar section (circular image or fallback initials)
-    if data.provider_image:
+    Branches on (audience, stage) so the same template serves the student's "you booked
+    a session" email, the professional's "you have a new request" email, and the
+    "your booking is confirmed" email sent once the professional accepts.
+    """
+    is_intro = data.booking_type == "intro_call"
+    session_word = "intro call" if is_intro else "session"
+    is_professional = data.audience == "professional"
+    is_confirmed = data.stage == "confirmed"
+
+    recipient_name = data.provider_name if is_professional else data.student_name
+    other_party_name = data.student_name if is_professional else data.provider_name
+
+    if data.stage == "reminder":
+        heading = "Upcoming Session Reminder"
+        emoji = "⏰"
+        greeting = f"Hi {recipient_name}, your {session_word} with {other_party_name} starts soon — see the details below."
+    elif is_professional and not is_confirmed:
+        heading = f"New {session_word.title()} Request!"
+        emoji = "📬"
+        greeting = f"Hi {recipient_name}, {other_party_name} has requested a {session_word} with you. Log in to confirm or manage it."
+    elif is_professional and is_confirmed:
+        heading = f"{session_word.title()} Confirmed!"
+        emoji = "🎉"
+        greeting = f"Hi {recipient_name}, your {session_word} with {other_party_name} is confirmed."
+    elif is_confirmed:
+        heading = f"{session_word.title()} Confirmed!"
+        emoji = "🎉"
+        greeting = f"Hi {recipient_name}, {other_party_name} has confirmed your {session_word}!"
+    else:
+        heading = "Intro Call Confirmed!" if is_intro else "Session Booking Confirmed!"
+        emoji = "☕" if is_intro else "🎉"
+        greeting = f"Hi {recipient_name}, your {session_word} has been booked!"
+
+    # Avatar section for the "other party" card (circular image or fallback initials) — a
+    # photo is only available for the provider, so the professional-audience email (whose
+    # card represents the student) always falls back to initials.
+    card_image = None if is_professional else data.provider_image
+    if card_image:
         avatar_html = (
-            f'<img src="{data.provider_image}" alt="{data.provider_name}" '
+            f'<img src="{card_image}" alt="{other_party_name}" '
             f'style="width:80px;height:80px;border-radius:50%;object-fit:cover;'
             f'border:3px solid #8BB73F;" />'
         )
     else:
-        initials = "".join(w[0].upper() for w in data.provider_name.split()[:2])
+        initials = "".join(w[0].upper() for w in other_party_name.split()[:2]) or "?"
         avatar_html = (
             f'<div style="width:80px;height:80px;border-radius:50%;'
             f'background:linear-gradient(135deg,#8BB73F,#4A5D23);color:#fff;'
@@ -1195,6 +1491,7 @@ def _build_booking_email_html(data: BookingEmailInput) -> str:
             f'font-size:28px;font-weight:700;border:3px solid #8BB73F;">'
             f'{initials}</div>'
         )
+    card_label = "Your Student" if is_professional else "Your Professional"
 
     # Cost row (only show if provided)
     cost_row = ""
@@ -1241,16 +1538,16 @@ def _build_booking_email_html(data: BookingEmailInput) -> str:
       <div style="font-size:48px;margin-bottom:10px;">{emoji}</div>
       <h2 style="color:#4A5D23;margin:0;font-size:22px;">{heading}</h2>
       <p style="color:#64748b;font-size:15px;margin-top:8px;">
-        Hi {data.student_name}, your {"intro call" if is_intro else "session"} has been booked!
+        {greeting}
       </p>
     </div>
 
-    <!-- Provider Card -->
+    <!-- Other Party Card -->
     <div style="text-align:center;padding:20px 30px;">
       <div style="display:inline-block;padding:20px 30px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">
         {avatar_html}
-        <div style="margin-top:10px;font-size:18px;font-weight:700;color:#1e293b;">{data.provider_name}</div>
-        <div style="color:#8BB73F;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Your Professional</div>
+        <div style="margin-top:10px;font-size:18px;font-weight:700;color:#1e293b;">{other_party_name}</div>
+        <div style="color:#8BB73F;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">{card_label}</div>
       </div>
     </div>
 
@@ -1297,14 +1594,21 @@ def _build_booking_email_html(data: BookingEmailInput) -> str:
 
 @app.post("/send-booking-email")
 async def send_booking_email(input: BookingEmailInput):
-    """Send a beautifully branded booking confirmation email."""
+    """Send a beautifully branded booking-related email (request, confirmation, or reminder)."""
     html = _build_booking_email_html(input)
     is_intro = input.booking_type == "intro_call"
-    subject = (
-        f"☕ Intro call booked with {input.provider_name}"
-        if is_intro
-        else f"🎉 Session booked with {input.provider_name}"
-    )
+    session_word = "Intro call" if is_intro else "Session"
+    is_professional = input.audience == "professional"
+    is_confirmed = input.stage == "confirmed"
+
+    if is_professional and not is_confirmed:
+        subject = f"📬 New {session_word.lower()} request from {input.student_name}"
+    elif is_confirmed:
+        other = input.student_name if is_professional else input.provider_name
+        subject = f"🎉 {session_word} confirmed with {other}"
+    else:
+        emoji = "☕" if is_intro else "🎉"
+        subject = f"{emoji} {session_word} booked with {input.provider_name}"
 
     try:
         if RESEND_API_KEY and resend:
@@ -1326,3 +1630,118 @@ async def send_booking_email(input: BookingEmailInput):
         raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
 
     return {"status": "sent", "subject": subject}
+
+
+# ---- Contact Us Email ----
+
+@app.post("/contact-us")
+async def send_contact_email(input: ContactEmailInput):
+    """Send a contact form submission to the admin."""
+    html = f"""
+    <html>
+    <body>
+      <h2>New Contact Form Submission</h2>
+      <p><strong>Name:</strong> {input.name}</p>
+      <p><strong>Email:</strong> {input.email}</p>
+      <p><strong>Subject:</strong> {input.subject}</p>
+      <p><strong>Message:</strong></p>
+      <p style="white-space: pre-wrap;">{input.message}</p>
+    </body>
+    </html>
+    """
+    
+    admin_email = "admin@fromb2c.africa"
+    try:
+        if RESEND_API_KEY and resend:
+            resend.Emails.send({
+                "from": EMAIL_FROM,
+                "to": admin_email,
+                "reply_to": input.email,
+                "subject": f"Contact Form: {input.subject}",
+                "html": html,
+            })
+        else:
+            message = MIMEText(html, "html")
+            message["Subject"] = f"Contact Form: {input.subject}"
+            message["From"] = EMAIL_FROM
+            message["To"] = admin_email
+            message.add_header("Reply-To", input.email)
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
+                server.send_message(message)
+    except Exception as exc:
+        logger.exception("Failed to send contact email")
+        raise HTTPException(status_code=502, detail=f"Could not send email: {exc}") from exc
+
+    return {"status": "sent"}
+
+# ---------------------------------------------------------------------------
+# Websocket Proxy for Deepgram Livestream
+# ---------------------------------------------------------------------------
+
+@app.websocket("/ws/livestream")
+async def websocket_livestream(websocket: WebSocket):
+    """
+    Proxies raw audio bytes from the client to Deepgram's streaming API,
+    and forwards the JSON transcription results back to the client.
+    """
+    await websocket.accept()
+    if not DEEPGRAM_API_KEY:
+        logger.error("DEEPGRAM_API_KEY not configured. Cannot start livestream.")
+        await websocket.close(code=1011)
+        return
+
+    deepgram_url = "wss://api.deepgram.com/v1/listen?model=nova-2&punctuate=true&encoding=linear16&sample_rate=16000&diarize=true"
+    headers = {"Authorization": f"Token {DEEPGRAM_API_KEY}"}
+
+    try:
+        async with websockets.connect(deepgram_url, additional_headers=headers) as dg_ws:
+            async def receive_from_client():
+                try:
+                    while True:
+                        data = await websocket.receive_bytes()
+                        await dg_ws.send(data)
+                except WebSocketDisconnect:
+                    pass
+                except Exception as e:
+                    logger.warning(f"Error reading from client websocket: {e}")
+
+            async def receive_from_deepgram():
+                try:
+                    while True:
+                        message = await dg_ws.recv()
+                        data = json.loads(message)
+
+                        if "channel" in data and "alternatives" in data["channel"]:
+                            alt = data["channel"]["alternatives"][0]
+                            text = alt.get("transcript", "")
+                            if text:
+                                is_final = data.get("is_final", False)
+                                words = alt.get("words", [])
+                                speaker = words[0].get("speaker", 0) if words else 0
+                                start = words[0].get("start", 0) if words else 0
+                                end = words[-1].get("end", 0) if words else 0
+
+                                await websocket.send_json({
+                                    "type": "transcript",
+                                    "is_final": is_final,
+                                    "text": text,
+                                    "speaker": speaker,
+                                    "start": start,
+                                    "end": end
+                                })
+                except websockets.exceptions.ConnectionClosed:
+                    pass
+                except Exception as e:
+                    logger.warning(f"Error reading from Deepgram websocket: {e}")
+
+            await asyncio.gather(
+                receive_from_client(),
+                receive_from_deepgram()
+            )
+    except Exception as e:
+        logger.error(f"Failed to connect to Deepgram: {e}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass

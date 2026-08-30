@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { AI_API_BASE } from './aiApi';
-import type { Profile, ProviderDetails, WorkExperience, ProfessionalReference, UserStatus, UserRole } from '../types/lms';
+import type { Profile, ProviderDetails, StudentDetails, WorkExperience, ProfessionalReference, UserStatus, UserRole } from '../types/lms';
 
 const STATUS_EMAIL_COPY: Record<string, { subject: string; body: (reason?: string | null) => string }> = {
   approved: {
@@ -165,6 +165,58 @@ export async function updateAccountStatus(
 
   if (error) throw error;
   await sendStatusEmail(updated, status, reason, status === 'approved');
+}
+
+// ============ ADMIN PROFILE EDITING ============
+// Lets an admin correct/complete another user's profile details. RLS-backed by the admin
+// update policies on profiles (00005), provider_details, and student_details (00032).
+
+export interface AccountEditDetail {
+  profile: Profile;
+  providerDetails: ProviderDetails | null;
+  studentDetails: StudentDetails | null;
+}
+
+export async function getAccountEditDetail(profileId: string): Promise<AccountEditDetail> {
+  const [profileRes, providerRes, studentRes] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', profileId).single(),
+    supabase.from('provider_details').select('*').eq('profile_id', profileId).maybeSingle(),
+    supabase.from('student_details').select('*').eq('profile_id', profileId).maybeSingle(),
+  ]);
+
+  if (profileRes.error) throw profileRes.error;
+
+  return {
+    profile: profileRes.data,
+    providerDetails: providerRes.data,
+    studentDetails: studentRes.data,
+  };
+}
+
+export async function adminUpdateProfileName(profileId: string, firstName: string, lastName: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ first_name: firstName, last_name: lastName, updated_at: new Date().toISOString() })
+    .eq('id', profileId);
+  if (error) throw error;
+}
+
+export type AdminProviderDetailsInput = Partial<Pick<ProviderDetails,
+  'bio' | 'qualifications' | 'specialties' | 'years_of_experience' | 'location' | 'phone_number'
+>>;
+
+export async function adminUpdateProviderDetails(profileId: string, fields: AdminProviderDetailsInput): Promise<void> {
+  const { error } = await supabase.from('provider_details').update(fields).eq('profile_id', profileId);
+  if (error) throw error;
+}
+
+export type AdminStudentDetailsInput = Partial<Pick<StudentDetails,
+  'student_type' | 'school_name' | 'grade' | 'institution_name' | 'course_of_study' | 'occupation' | 'employer' | 'goals'
+>>;
+
+export async function adminUpdateStudentDetails(profileId: string, fields: AdminStudentDetailsInput): Promise<void> {
+  const { error } = await supabase.from('student_details').update(fields).eq('profile_id', profileId);
+  if (error) throw error;
 }
 
 export async function promoteToAdmin(profileId: string): Promise<void> {

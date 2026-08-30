@@ -216,6 +216,7 @@
   border-left: 3px solid transparent;
   white-space: nowrap;
   cursor: pointer;
+  position: relative;
 }
 
 .sidebar-nav-item:hover {
@@ -257,6 +258,35 @@
 .sidebar.collapsed .sidebar-nav-label {
   opacity: 0;
   width: 0;
+}
+
+.sidebar-nav-badge {
+  background-color: #ef4444;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  margin-left: auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.sidebar.collapsed .sidebar-nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  margin-left: 0;
+  width: 8px;
+  height: 8px;
+  min-width: unset;
+  padding: 0;
+  border-radius: 50%;
+  color: transparent;
 }
 
 /* Sidebar Footer */
@@ -753,6 +783,38 @@
 
   .dashboard-page-title {
     font-size: 1.4rem;
+  }
+}
+
+/* ---- Responsive grid utilities ----
+   Replaces hardcoded inline `gridTemplateColumns` on dashboard pages. Inline styles can't carry
+   a media query, so a fixed two-column layout (especially one with a px-sized sidebar track)
+   forces horizontal scrolling on a phone. These collapse to a single column instead. */
+
+/* Main content + fixed-width side panel (e.g. My Calendar's availability manager). */
+.dash-split-panel {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Paired form fields. */
+.dash-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .dash-split-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dash-form-grid {
+    grid-template-columns: 1fr;
   }
 }
 

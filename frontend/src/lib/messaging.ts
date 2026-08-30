@@ -179,6 +179,39 @@ export async function sendMessage(conversationId: string, body: string): Promise
   return data;
 }
 
+/**
+ * Fired whenever unread state changes, so chrome outside the current page (the sidebar badges
+ * in DashboardLayout) can refresh immediately instead of waiting for its 30s poll.
+ */
+export const UNREAD_CHANGED_EVENT = 'tutormina:unread-changed';
+
+/**
+ * Mark every message the other participant sent in this conversation as read.
+ * Backed by the "Recipients can mark messages read" policy (00036) — a user can only ever
+ * stamp read_at on messages they received, never on ones they sent.
+ */
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { data, error } = await supabase
+    .from('messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', user.id)
+    .is('read_at', null)
+    .select('id');
+
+  if (error) {
+    console.error('Failed to mark conversation read:', error);
+    return;
+  }
+
+  if (data && data.length > 0) {
+    window.dispatchEvent(new CustomEvent(UNREAD_CHANGED_EVENT));
+  }
+}
+
 export function subscribeToConversation(
   conversationId: string,
   onInsert: (message: Message) => void
@@ -246,4 +279,31 @@ export function subscribeToNotifications(
       (payload) => onInsert(payload.new as Notification)
     )
     .subscribe();
+}
+
+export async function getTotalUnreadMessageCount(): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  
+  const { data: conversations, error: convError } = await supabase
+    .from('conversations')
+    .select('id')
+    .or(`participant_one_id.eq.${user.id},participant_two_id.eq.${user.id}`);
+    
+  if (convError || !conversations?.length) return 0;
+  
+  const convIds = conversations.map(c => c.id);
+  
+  const { count, error } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .in('conversation_id', convIds)
+    .neq('sender_id', user.id)
+    .is('read_at', null);
+    
+  if (error) {
+    console.error('Error fetching unread messages count:', error);
+    return 0;
+  }
+  return count ?? 0;
 }

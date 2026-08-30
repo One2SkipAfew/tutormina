@@ -11,6 +11,7 @@ import {
   subscribeToConversation,
   getMessageableContacts,
   getOrCreateConversation,
+  markConversationRead,
 } from '../../lib/messaging';
 import { useModal, useToast } from '../../contexts/NotificationContext';
 import '../../styles/messaging.css';
@@ -72,7 +73,15 @@ export default function Messages() {
     let cancelled = false;
     setLoadingMessages(true);
     getMessages(activeConversationId)
-      .then((data) => { if (!cancelled) setMessages(data); })
+      .then(async (data) => {
+        if (cancelled) return;
+        setMessages(data);
+        // Opening a conversation is what "viewing" a message means — stamp read_at so the
+        // sidebar bubble and per-conversation unread count actually clear (and stay cleared
+        // across refreshes, since this is real DB state rather than local view state).
+        await markConversationRead(activeConversationId);
+        if (!cancelled) loadConversations();
+      })
       .catch((err) => {
         if (!cancelled) {
           showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load messages', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
@@ -83,6 +92,8 @@ export default function Messages() {
     channelRef.current?.unsubscribe();
     channelRef.current = subscribeToConversation(activeConversationId, (message) => {
       setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      // A message arriving while the thread is open counts as read immediately.
+      markConversationRead(activeConversationId);
     });
 
     return () => {

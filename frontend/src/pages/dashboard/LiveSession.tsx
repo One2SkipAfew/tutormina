@@ -9,6 +9,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 
 import { useAILivestream } from '../../contexts/AILivestreamContext';
+import { useModal } from '../../contexts/NotificationContext';
 import { Radio, Mic, Play, Pause, Square, FileText, Sparkles, Loader, RefreshCw, Shield, Search, Package, Save, CheckCircle, XCircle, AlertTriangle, HelpCircle } from 'lucide-react';
 import '../../styles/live-session.css';
 
@@ -47,8 +48,11 @@ export default function LiveSession() {
     saved,
     generateNotes,
     endAndSummarise,
-    saveSession
+    saveSession,
+    resetSession
   } = useAILivestream();
+
+  const { showModal } = useModal();
 
   // UI State
   const [expandedClaim, setExpandedClaim] = useState<number | null>(null);
@@ -122,9 +126,47 @@ export default function LiveSession() {
           </div>
 
           {!transcript.isListening ? (
-            <button className="ls-btn ls-btn-start" onClick={() => transcript.start()} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Mic size={16} /> Start Recording
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {(transcript.transcriptEntries.length > 0 || aiNotes || factChecker.results.length > 0) && (
+                <button
+                  className="ls-btn"
+                  onClick={() => {
+                    showModal({
+                      type: 'warning',
+                      title: 'Clear Session',
+                      message: 'Are you sure you want to clear the current session? Any unsaved data will be lost.',
+                      buttons: [
+                        {
+                          label: 'Clear Session',
+                          variant: 'outline',
+                          onClick: () => resetSession()
+                        },
+                        {
+                          label: 'Save & Clear',
+                          variant: 'primary',
+                          onClick: () => {
+                            saveSession().then(() => resetSession());
+                          }
+                        },
+                        {
+                          label: 'Cancel',
+                          variant: 'outline',
+                          onClick: 'dismiss'
+                        }
+                      ]
+                    });
+                  }}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', gap: '0.4rem'
+                  }}
+                >
+                  <RefreshCw size={16} /> Clear Session
+                </button>
+              )}
+              <button className="ls-btn ls-btn-start" onClick={() => transcript.start()} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Mic size={16} /> Start Recording
+              </button>
+            </div>
           ) : (
             <div className="ls-controls">
               <button className={`ls-btn ls-btn-pause ${transcript.isPaused ? 'paused' : ''}`} onClick={transcript.togglePause} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

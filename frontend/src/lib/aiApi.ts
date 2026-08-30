@@ -111,9 +111,30 @@ export interface LiveNotesResponse {
 
 // ---- Helper ----
 
+// Generous timeout + one retry so a Hugging Face Space cold start (which can take well past a
+// typical browser timeout) doesn't surface as an immediate "failed to fetch" to the user.
+const AI_API_TIMEOUT_MS = 1200000;
+
+async function fetchWithTimeout(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(new Error(`Request to ${url.split('/').pop()} timed out after ${AI_API_TIMEOUT_MS / 1000} seconds. The backend might be overloaded.`)), AI_API_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function aiApiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${AI_API_BASE}${path}`;
-  const response = await fetch(url, options);
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, options);
+  } catch {
+    // Likely a cold-start timeout/network hiccup — retry once before giving up.
+    response = await fetchWithTimeout(url, options);
+  }
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => 'Unknown error');

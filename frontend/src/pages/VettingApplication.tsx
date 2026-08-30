@@ -260,7 +260,7 @@ export default function VettingApplication() {
             {uploadingQualifications ? 'Uploading...' : qualificationsFileUrl ? 'Replace file' : 'Upload document'}
             <input 
               type="file" 
-              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" 
+              accept="*/*"
               hidden 
               disabled={uploadingQualifications}
               onChange={async (e) => {

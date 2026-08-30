@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { AI_API_BASE } from './aiApi';
 import type { ProviderDetails, WorkExperience, ProfessionalReference } from '../types/lms';
 
 const PHOTO_BUCKET = 'professional-photos';
@@ -34,6 +35,13 @@ export async function uploadProfessionalPhoto(file: File): Promise<string> {
     .eq('profile_id', user.id);
 
   if (updateError) throw updateError;
+  
+  // Also update the main profile avatar so it shows up globally
+  await supabase
+    .from('profiles')
+    .update({ avatar_url: publicUrl })
+    .eq('id', user.id);
+
   return publicUrl;
 }
 
@@ -47,7 +55,7 @@ export async function uploadProviderQualifications(file: File): Promise<string> 
 
   const { error: uploadError } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(storagePath, file, { cacheControl: '3600', upsert: true });
+    .upload(storagePath, file, { cacheControl: '3600', upsert: true, contentType: file.type });
 
   if (uploadError) throw uploadError;
 
@@ -193,4 +201,19 @@ export async function submitApplication(): Promise<void> {
     .update({ application_submitted_at: new Date().toISOString() })
     .eq('profile_id', user.id);
   if (providerError) throw providerError;
+
+  // Best-effort: welcome email confirming the application was received.
+  try {
+    await fetch(`${AI_API_BASE}/send-application-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: user.email,
+        subject: 'We’ve received your TutorMina application',
+        body: 'Thanks for applying to join TutorMina! Our team will review your application and get back to you soon. You can check your application status any time from your dashboard.',
+      }),
+    });
+  } catch {
+    // Non-fatal - the in-app status page is the source of truth.
+  }
 }

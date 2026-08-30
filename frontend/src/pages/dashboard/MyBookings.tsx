@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { getMyBookingsAsCustomer, respondToProposedTime, cancelBooking, updateMeetingLink, type BookingWithProvider } from '../../lib/bookings';
 import { getOrCreateConversation, sendMessage } from '../../lib/messaging';
+import { provisionVideoRoom } from '../../lib/videoRooms';
 import { getRoleDisplayName } from '../../types/lms';
 import type { Profile, ProviderDetails } from '../../types/lms';
 import BookingCalendarModal from '../../components/directory/BookingCalendarModal';
@@ -31,6 +32,7 @@ export default function MyBookings() {
 
   const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState('');
+  const [startingSessionFor, setStartingSessionFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +90,30 @@ export default function MyBookings() {
     setCancelingId(null);
     setCancelReason('');
     load();
+  };
+
+  // Students can start a confirmed session themselves — the room is provisioned on demand if the
+  // professional's confirm-time provisioning didn't run or failed, so neither side gets stuck.
+  const handleStartSession = async (booking: BookingWithProvider) => {
+    if (booking.video_room_id) {
+      navigate(`/dashboard/video-room/${booking.video_room_id}`);
+      return;
+    }
+    setStartingSessionFor(booking.id);
+    try {
+      const room = await provisionVideoRoom(booking.id);
+      setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, video_room_id: room.id } : b));
+      navigate(`/dashboard/video-room/${room.id}`);
+    } catch (err) {
+      showModal({
+        type: 'error',
+        title: 'Could Not Start Session',
+        message: err instanceof Error ? err.message : 'Failed to prepare the video room.',
+        buttons: [{ label: 'Try Again', variant: 'primary', onClick: () => handleStartSession(booking) }, { label: 'Close', variant: 'outline', onClick: 'dismiss' }],
+      });
+    } finally {
+      setStartingSessionFor(null);
+    }
   };
 
   const handleSaveLink = async (bookingId: string) => {
@@ -160,9 +186,14 @@ export default function MyBookings() {
                 <Video size={16} /> Join Video Room
               </button>
             ) : (
-              <div style={{ fontSize: '0.8rem', color: '#b06000', background: '#fef7e0', padding: '0.4rem 0.8rem', borderRadius: '8px', alignSelf: 'flex-start' }}>
-                Video room is being prepared...
-              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ alignSelf: 'flex-start', background: 'linear-gradient(135deg, var(--color-primary), var(--color-spring-dark))', border: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                disabled={startingSessionFor === b.id}
+                onClick={() => handleStartSession(b)}
+              >
+                <Video size={16} /> {startingSessionFor === b.id ? 'Preparing room...' : 'Start Session'}
+              </button>
             )
           ) : b.meeting_link ? (
             <a href={b.meeting_link} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>

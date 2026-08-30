@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getZoneColor, getZoneLabel, getRoleDisplayName } from '../../types/lms';
 import NotificationBell from '../shared/NotificationBell';
 import { AILivestreamProvider } from '../../contexts/AILivestreamContext';
 import ActiveRecordingWidget from '../ActiveRecordingWidget';
+import { getTotalUnreadMessageCount, UNREAD_CHANGED_EVENT } from '../../lib/messaging';
+import { getPendingBookingsCount } from '../../lib/bookings';
 import '../../styles/dashboard.css';
 
 // SVG Icons as inline components
@@ -104,6 +106,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.FC;
+  badgeCount?: number;
 }
 
 function DashboardLayoutInner() {
@@ -111,16 +114,46 @@ function DashboardLayoutInner() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [pendingBookings, setPendingBookings] = useState(0);
 
   const role = profile?.role ?? 'customer';
   const zone = getZoneColor(role);
   const zoneLabel = getZoneLabel(role);
 
+  const fetchBadges = useCallback(async () => {
+    try {
+      setUnreadMessages(await getTotalUnreadMessageCount());
+      if (role === 'tutor' || role === 'coach') {
+        setPendingBookings(await getPendingBookingsCount());
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [role]);
+
+  // Badges reflect real DB state (messages.read_at / bookings.status), so they clear when the
+  // underlying item is actually actioned — opening a thread marks it read, confirming or
+  // declining a request drops it out of the pending count — and stay cleared across refreshes.
+  // Re-fetch on navigation so acting on one page updates the badge on the next paint.
+  useEffect(() => {
+    fetchBadges();
+    const interval = setInterval(fetchBadges, 30000);
+    window.addEventListener(UNREAD_CHANGED_EVENT, fetchBadges);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener(UNREAD_CHANGED_EVENT, fetchBadges);
+    };
+  }, [fetchBadges, location.pathname]);
+
+  const displayedMessageBadge = unreadMessages;
+  const displayedBookingBadge = pendingBookings;
+
   const navItems: NavItem[] = useMemo(() => {
     const common: NavItem[] = [
       { to: '/dashboard', label: 'Overview', icon: Icons.Home },
       { to: '/dashboard/profile', label: 'My Profile', icon: Icons.User },
-      { to: '/dashboard/messages', label: 'Messages', icon: Icons.MessageCircle },
+      { to: '/dashboard/messages', label: 'Messages', icon: Icons.MessageCircle, badgeCount: displayedMessageBadge },
       { to: '/dashboard/shared-drive', label: 'SharedDrive', icon: Icons.Drive },
     ];
 
@@ -137,7 +170,7 @@ function DashboardLayoutInner() {
         ...common,
         { to: '/dashboard/resources', label: 'My Resources', icon: Icons.Folder },
         { to: '/dashboard/students', label: 'My Students', icon: Icons.Users },
-        { to: '/dashboard/calendar', label: 'My Calendar', icon: Icons.Calendar },
+        { to: '/dashboard/calendar', label: 'My Calendar', icon: Icons.Calendar, badgeCount: displayedBookingBadge },
         { to: '/dashboard/live-session', label: 'Live Session', icon: Icons.Radio },
         { to: '/dashboard/session-recordings', label: 'Session Recordings', icon: Icons.Film },
         { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
@@ -153,7 +186,7 @@ function DashboardLayoutInner() {
       { to: '/dashboard/learning-zone', label: 'Learning Zone', icon: Icons.BarChart },
       { to: '/dashboard/ai-insights', label: 'AI Insights', icon: Icons.Sparkles },
     ];
-  }, [role]);
+  }, [role, displayedMessageBadge, displayedBookingBadge]);
 
   const currentPageTitle = useMemo(() => {
     const path = location.pathname;
@@ -214,6 +247,9 @@ function DashboardLayoutInner() {
               >
                 <item.icon />
                 <span className="sidebar-nav-label">{item.label}</span>
+                {item.badgeCount && item.badgeCount > 0 ? (
+                  <span className="sidebar-nav-badge">{item.badgeCount > 99 ? '99+' : item.badgeCount}</span>
+                ) : null}
               </NavLink>
             ))}
           </div>

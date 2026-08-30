@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Home from './pages/Home';
@@ -10,31 +10,43 @@ import ResetPassword from './pages/ResetPassword';
 import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
-import DashboardLayout from './components/layouts/DashboardLayout';
 import ProtectedRoute from './components/shared/ProtectedRoute';
-import DashboardHome from './pages/dashboard/DashboardHome';
-import ProfileEditor from './pages/dashboard/ProfileEditor';
-import SharedDrive from './pages/dashboard/SharedDrive';
-import ResourceManager from './pages/dashboard/ResourceManager';
-import MyStudents from './pages/dashboard/MyStudents';
-import AIInsights from './pages/dashboard/AIInsights';
-import Messages from './pages/dashboard/Messages';
-import ProfileVisits from './pages/dashboard/ProfileVisits';
-import VettingApplication from './pages/VettingApplication';
-import ApplicationStatus from './pages/ApplicationStatus';
-import AdminApplications from './pages/dashboard/admin/Applications';
-import AdminAccounts from './pages/dashboard/admin/Accounts';
-import AdminSetup from './pages/AdminSetup';
-import AdminLogin from './pages/AdminLogin';
 import Directory from './pages/Directory';
 import DirectoryProfile from './pages/DirectoryProfile';
-import ProviderCalendar from './pages/dashboard/ProviderCalendar';
-import MyBookings from './pages/dashboard/MyBookings';
-import LearningZone from './pages/dashboard/LearningZone';
-import LiveSession from './pages/dashboard/LiveSession';
-import SessionRecordings from './pages/dashboard/SessionRecordings';
-import VideoRoom from './pages/dashboard/VideoRoom';
 import './index.css';
+
+// The dashboard is a large, authenticated-only surface. Splitting it out keeps it off the
+// critical path for the public pages, which is what most first-time (and mobile) visitors load.
+const DashboardLayout = lazy(() => import('./components/layouts/DashboardLayout'));
+const DashboardHome = lazy(() => import('./pages/dashboard/DashboardHome'));
+const ProfileEditor = lazy(() => import('./pages/dashboard/ProfileEditor'));
+const SharedDrive = lazy(() => import('./pages/dashboard/SharedDrive'));
+const ResourceManager = lazy(() => import('./pages/dashboard/ResourceManager'));
+const MyStudents = lazy(() => import('./pages/dashboard/MyStudents'));
+const AIInsights = lazy(() => import('./pages/dashboard/AIInsights'));
+const Messages = lazy(() => import('./pages/dashboard/Messages'));
+const ProfileVisits = lazy(() => import('./pages/dashboard/ProfileVisits'));
+const VettingApplication = lazy(() => import('./pages/VettingApplication'));
+const ApplicationStatus = lazy(() => import('./pages/ApplicationStatus'));
+const AdminApplications = lazy(() => import('./pages/dashboard/admin/Applications'));
+const AdminAccounts = lazy(() => import('./pages/dashboard/admin/Accounts'));
+const AdminSetup = lazy(() => import('./pages/AdminSetup'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const ProviderCalendar = lazy(() => import('./pages/dashboard/ProviderCalendar'));
+const MyBookings = lazy(() => import('./pages/dashboard/MyBookings'));
+const LearningZone = lazy(() => import('./pages/dashboard/LearningZone'));
+const LiveSession = lazy(() => import('./pages/dashboard/LiveSession'));
+const SessionRecordings = lazy(() => import('./pages/dashboard/SessionRecordings'));
+const VideoRoom = lazy(() => import('./pages/dashboard/VideoRoom'));
+
+function RouteFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', gap: '0.75rem', color: 'var(--color-text-muted)' }}>
+      <div className="spinner" />
+      <span>Loading…</span>
+    </div>
+  );
+}
 
 function PublicNav() {
   const { session, signOut } = useAuth();
@@ -107,6 +119,7 @@ function App() {
     <AuthProvider>
       <NotificationProvider>
       <Router>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public Pages */}
           <Route path="/" element={<PublicLayout><Home /></PublicLayout>} />
@@ -193,6 +206,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </Router>
       </NotificationProvider>
     </AuthProvider>
