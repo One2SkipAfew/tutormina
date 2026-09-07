@@ -10,7 +10,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { useAILivestream } from '../../contexts/AILivestreamContext';
 import { useModal } from '../../contexts/NotificationContext';
-import { Radio, Mic, Play, Pause, Square, FileText, Sparkles, Loader, RefreshCw, Shield, Search, Package, Save, CheckCircle, XCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Radio, Mic, Play, Pause, Square, FileText, Sparkles, Loader, RefreshCw, Shield, Search, Package, Save, CheckCircle, XCircle, AlertTriangle, HelpCircle, Download } from 'lucide-react';
 import '../../styles/live-session.css';
 
 const formatTime = (secs: number): string => {
@@ -378,6 +378,22 @@ export default function LiveSession() {
             >
               {saved ? <><CheckCircle size={16} /> Saved</> : isSaving ? <><Loader size={16} className="spin" /> Saving...</> : <><Save size={16} /> Save Session</>}
             </button>
+            {saved && (
+              <button
+                className="ls-btn"
+                onClick={() => {
+                  const content = `${sessionSummary ? `Summary:\n${sessionSummary}\n\n` : ''}Transcript:\n${transcript.getFullTranscript() || ''}`;
+                  const blob = new Blob([content], { type: 'text/plain' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `Live_Session_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`;
+                  a.click();
+                }}
+                style={{ background: '#fff', color: '#16a34a', border: '1px solid #22c55e', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Download size={16} /> Download
+              </button>
+            )}
           </>
         )}
       </div>
@@ -397,6 +413,22 @@ export default function LiveSession() {
                 >
                   {saved ? <><CheckCircle size={14} /> Saved</> : isSaving ? <><Loader size={14} className="spin" /> Saving...</> : <><Save size={14} /> Save</>}
                 </button>
+                {saved && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => {
+                      const content = `${sessionSummary ? `Summary:\n${sessionSummary}\n\n` : ''}Transcript:\n${transcript.getFullTranscript() || ''}`;
+                      const blob = new Blob([content], { type: 'text/plain' });
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `Live_Session_${new Date().toLocaleDateString().replace(/\//g, '-')}.txt`;
+                      a.click();
+                    }}
+                    style={{ color: '#16a34a', borderColor: '#22c55e', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Download size={14} /> Download
+                  </button>
+                )}
                 <button className="btn btn-outline btn-sm" onClick={() => setShowSummaryModal(false)}>
                   Close
                 </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../types/lms';
@@ -11,7 +11,7 @@ import { getFiles } from '../../lib/sharedDrive';
 import { supabase } from '../../lib/supabaseClient';
 import SessionCompletionPrompt from '../../components/shared/SessionCompletionPrompt';
 
-import { Users, BookOpen, Calendar, Clock, MessageCircle, Target, Trophy, UploadCloud, HardDrive, Sparkles, ClipboardCheck, User, Eye } from 'lucide-react';
+import { Users, BookOpen, Calendar, Clock, MessageCircle, Target, Trophy, UploadCloud, HardDrive, Sparkles, ClipboardCheck, User, Eye, GraduationCap, Handshake, Shield, CheckCircle, XCircle, PauseCircle, Ban, Trash2, Folder, MessageSquare, Bell } from 'lucide-react';
 
 interface StatItem {
   icon: React.ReactNode;
@@ -241,51 +241,51 @@ function getQuickActionsForRole(role: UserRole): QuickAction[] {
   ];
 }
 
-function getWelcomeMessage(role: UserRole, name: string, isParentMode: boolean): { title: string; subtitle: string } {
+function getWelcomeMessage(role: UserRole, name: string, isParentMode: boolean): { title: React.ReactNode; subtitle: string } {
   if (isParentMode) {
     return {
-      title: `Welcome back, ${name} 👨‍👩‍👧`,
+      title: <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>Welcome back, {name} <Users size={28} /></span>,
       subtitle: "You're viewing in Parent Mode. Track your child's progress and access shared resources.",
     };
   }
   if (role === 'tutor') {
     return {
-      title: `Welcome back, ${name} 🎓`,
+      title: <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>Welcome back, {name} <BookOpen size={28} /></span>,
       subtitle: 'Manage your resources, connect with students, and leverage AI to enhance learning.',
     };
   }
   if (role === 'coach') {
     return {
-      title: `Welcome back, ${name} 🤝`,
+      title: <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>Welcome back, {name} <Handshake size={28} /></span>,
       subtitle: 'Manage your coaching materials, track client progress, and share insights.',
     };
   }
   if (role === 'admin') {
     return {
-      title: `Welcome back, ${name} 🛡️`,
+      title: <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>Welcome back, {name} <Shield size={28} /></span>,
       subtitle: 'Review professional applications and oversee platform accounts.',
     };
   }
   return {
-    title: `Hey ${name}! 👋`,
+    title: <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}>Hey {name}! <GraduationCap size={28} /></span>,
     subtitle: 'Access your learning resources, track your sessions, and explore AI-powered study tools.',
   };
 }
 
-const ACTIVITY_COPY: Record<string, { icon: string; label: (name: string, role: UserRole) => string }> = {
-  approved: { icon: '✅', label: (name, role) => `Approved ${name}'s ${role === 'customer' ? 'account' : 'application'}` },
-  declined: { icon: '❌', label: (name) => `Declined ${name}'s application` },
-  suspended: { icon: '⏸️', label: (name) => `Suspended ${name}'s account` },
-  blocked: { icon: '🚫', label: (name) => `Blocked ${name}'s account` },
-  deleted: { icon: '🗑️', label: (name) => `Deactivated ${name}'s account` },
+const ACTIVITY_COPY: Record<string, { icon: React.ReactNode; color: string; bg: string; label: (name: string, role: UserRole) => string }> = {
+  approved: { icon: <CheckCircle size={20} />, color: '#10b981', bg: '#d1fae5', label: (name, role) => `Approved ${name}'s ${role === 'customer' ? 'account' : 'application'}` },
+  declined: { icon: <XCircle size={20} />, color: '#f97316', bg: '#ffedd5', label: (name) => `Declined ${name}'s application` },
+  suspended: { icon: <PauseCircle size={20} />, color: '#eab308', bg: '#fef08a', label: (name) => `Suspended ${name}'s account` },
+  blocked: { icon: <Ban size={20} />, color: '#ef4444', bg: '#fee2e2', label: (name) => `Blocked ${name}'s account` },
+  deleted: { icon: <Trash2 size={20} />, color: '#6b7280', bg: '#f3f4f6', label: (name) => `Deactivated ${name}'s account` },
 };
 
-const ACTIVITY_ICONS: Record<string, string> = {
-  booking: '📅',
-  resource: '📁',
-  client: '👤',
-  message: '💬',
-  notification: '🔔',
+const ACTIVITY_ICONS: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+  booking: { icon: <Calendar size={20} />, color: '#6366f1', bg: '#e0e7ff' },
+  resource: { icon: <Folder size={20} />, color: '#10b981', bg: '#d1fae5' },
+  client: { icon: <User size={20} />, color: '#0ea5e9', bg: '#e0f2fe' },
+  message: { icon: <MessageSquare size={20} />, color: '#f59e0b', bg: '#fef3c7' },
+  notification: { icon: <Bell size={20} />, color: '#f43f5e', bg: '#ffe4e6' },
 };
 
 function formatRelativeTime(iso: string): string {
@@ -454,18 +454,31 @@ export default function DashboardHome() {
                   return (
                     <div
                       key={`${item.id}-${item.reviewed_at}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.25rem', borderBottom: '1px solid rgba(0,0,0,0.06)' }}
+                      style={{ 
+                        display: 'flex', alignItems: 'center', gap: '0.85rem', 
+                        padding: '0.75rem 1rem', 
+                        borderLeft: `3px solid ${copy?.color || '#cbd5e1'}`,
+                        borderBottom: '1px solid rgba(0,0,0,0.04)',
+                        backgroundColor: '#ffffff'
+                      }}
                     >
-                      <span style={{ fontSize: '1.25rem' }}>{copy?.icon ?? '•'}</span>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 36, height: 36, borderRadius: 8,
+                        backgroundColor: copy?.bg || '#f1f5f9',
+                        color: copy?.color || '#64748b'
+                      }}>
+                        {copy?.icon ?? <span style={{width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'}}>&bull;</span>}
+                      </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.88rem' }}>
+                        <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 500 }}>
                           {copy ? copy.label(`${item.first_name} ${item.last_name}`, item.role) : `Updated ${item.first_name} ${item.last_name}`}
                         </div>
                         {item.status_reason && (
-                          <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{item.status_reason}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>{item.status_reason}</div>
                         )}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 500 }}>
                         {formatRelativeTime(item.reviewed_at)}
                       </div>
                     </div>
@@ -483,22 +496,42 @@ export default function DashboardHome() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {aggregatedActivity.map((item) => (
-                <a
-                  key={item.id}
-                  href={item.link}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.25rem', borderBottom: '1px solid rgba(0,0,0,0.06)', textDecoration: 'none', color: 'inherit' }}
-                >
-                  <span style={{ fontSize: '1.25rem' }}>{ACTIVITY_ICONS[item.type] ?? '🔔'}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.88rem', fontWeight: item.isUnread ? 600 : 500 }}>{item.title}</div>
-                    {item.description && <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>{item.description}</div>}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                    {formatRelativeTime(item.timestamp)}
-                  </div>
-                </a>
-              ))}
+              {aggregatedActivity.map((item) => {
+                const iconData = ACTIVITY_ICONS[item.type] || { icon: <Bell size={20} />, color: '#94a3b8', bg: '#f1f5f9' };
+                return (
+                  <a
+                    key={item.id}
+                    href={item.link}
+                    style={{ 
+                      display: 'flex', alignItems: 'center', gap: '0.85rem', 
+                      padding: '0.75rem 1rem', 
+                      borderLeft: `3px solid ${iconData.color}`,
+                      borderBottom: '1px solid rgba(0,0,0,0.04)', 
+                      textDecoration: 'none', color: 'inherit',
+                      backgroundColor: item.isUnread ? 'rgba(0,0,0,0.015)' : '#ffffff',
+                      transition: 'background-color 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = item.isUnread ? 'rgba(0,0,0,0.015)' : '#ffffff'}
+                  >
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 36, height: 36, borderRadius: 8,
+                      backgroundColor: iconData.bg,
+                      color: iconData.color
+                    }}>
+                      {iconData.icon}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: item.isUnread ? 600 : 500 }}>{item.title}</div>
+                      {item.description && <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>{item.description}</div>}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#94a3b8', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                      {formatRelativeTime(item.timestamp)}
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>

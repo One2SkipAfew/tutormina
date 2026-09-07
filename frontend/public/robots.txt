@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Prevent indexing of private dashboard routes (even though they are protected by auth, it's good practice)
+Disallow: /dashboard/*
+Disallow: /api/*
+
+# Provide sitemap location
+Sitemap: https://tutormina.africa/sitemap.xml

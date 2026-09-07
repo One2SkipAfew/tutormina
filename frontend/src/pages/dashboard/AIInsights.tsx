@@ -658,6 +658,22 @@ export default function AIInsights() {
                           {note.transcript}
                         </div>
                       )}
+                      <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b' }}
+                          onClick={() => {
+                            const content = `${note.summary ? `Summary:\n${note.summary}\n\n` : ''}${note.key_topics && note.key_topics.length ? `Key Topics:\n${note.key_topics.join(', ')}\n\n` : ''}Transcript:\n${note.transcript || ''}`;
+                            const blob = new Blob([content], { type: 'text/plain' });
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(blob);
+                            a.download = `${note.title}.txt`;
+                            a.click();
+                          }}
+                        >
+                          <Download size={14} /> Download Note
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

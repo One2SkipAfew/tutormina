@@ -1,3 +1,4 @@
+import { GraduationCap, Handshake, Calendar, LineChart } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,7 +41,7 @@ export default function MyStudents() {
     <div className="animate-slide-up">
       <div className="dashboard-page-header">
         <h1 className="dashboard-page-title">
-          {isCoach ? '🤝 My Clients' : '👨‍🎓 My Students'}
+          {isCoach ? <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}><Handshake size={28} /> My Clients</span> : <span style={{display:'inline-flex',alignItems:'center',gap:'0.4rem'}}><GraduationCap size={28} /> My Students</span>}
         </h1>
         <p className="dashboard-page-subtitle">
           {isCoach
@@ -57,7 +58,7 @@ export default function MyStudents() {
         <div className="stat-card">
           <div className="stat-card-header">
             <div className={`stat-card-icon ${zone}`}>
-              {isCoach ? '🤝' : '👨‍🎓'}
+              {isCoach ? <Handshake size={24} /> : <GraduationCap size={24} />}
             </div>
           </div>
           <div className="stat-card-value">{loading ? '—' : students.length}</div>
@@ -65,14 +66,14 @@ export default function MyStudents() {
         </div>
         <div className="stat-card" role="button" tabIndex={0} onClick={() => navigate('/dashboard/calendar')} onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/calendar'); }} style={{ cursor: 'pointer' }}>
           <div className="stat-card-header">
-            <div className={`stat-card-icon ${zone}`}>📅</div>
+            <div className={`stat-card-icon ${zone}`}><Calendar size={24} /></div>
           </div>
           <div className="stat-card-value">{loading ? '—' : sessionsThisMonth}</div>
           <div className="stat-card-label">Sessions This Month</div>
         </div>
         <div className="stat-card" role="button" tabIndex={0} onClick={() => navigate('/dashboard/calendar')} onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/calendar'); }} style={{ cursor: 'pointer' }}>
           <div className="stat-card-header">
-            <div className={`stat-card-icon ${zone}`}>📈</div>
+            <div className={`stat-card-icon ${zone}`}><LineChart size={24} /></div>
           </div>
           <div className="stat-card-value">{loading ? '—' : students.reduce((sum, s) => sum + s.session_count, 0)}</div>
           <div className="stat-card-label">Total Sessions</div>
@@ -91,7 +92,7 @@ export default function MyStudents() {
             <p style={{ color: 'var(--color-text-muted)' }}>Loading...</p>
           ) : students.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-icon">{isCoach ? '🤝' : '👨‍🎓'}</div>
+              <div className="empty-state-icon">{isCoach ? <Handshake size={24} /> : <GraduationCap size={24} />}</div>
               <div className="empty-state-title">No {isCoach ? 'clients' : 'students'} yet</div>
               <div className="empty-state-text">
                 {isCoach

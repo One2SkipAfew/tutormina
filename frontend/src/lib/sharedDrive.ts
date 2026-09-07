@@ -453,3 +453,54 @@ export async function revokeStudentResourceAccess(studentId: string, providerId?
   if (error) throw error;
 }
 
+export async function revokeStudentFileAccess(studentId: string, fileId: string, providerId?: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const pid = providerId || user.id;
+
+  // Since grant_all overrides specific file grants, we can't cleanly "revoke one file" if grant_all is true
+  // without rewriting their entire grant to be explicit files minus this one.
+  // For simplicity, this function just deletes the specific file grant if it exists.
+  const { error } = await supabase
+    .from('student_resource_access')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('provider_id', pid)
+    .eq('grant_all', false)
+    .eq('file_id', fileId);
+
+  if (error) throw error;
+}
+
+export async function getFileAccessList(fileId: string): Promise<{ student_id: string; student_name: string; email: string; avatar_url: string | null; has_grant_all: boolean }[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Find all access records for this provider
+  const { data, error } = await supabase
+    .from('student_resource_access')
+    .select('student_id, grant_all, file_id, profiles!student_resource_access_student_id_fkey(first_name, last_name, email, avatar_url)')
+    .eq('provider_id', user.id);
+
+  if (error) throw error;
+
+  // Filter those who have grant_all or the specific file
+  const accessList = (data ?? [])
+    .filter(row => row.grant_all || row.file_id === fileId)
+    .map(row => {
+      const p = row.profiles as any;
+      return {
+        student_id: row.student_id,
+        student_name: `${p?.first_name} ${p?.last_name}`.trim() || 'Unknown Student',
+        email: p?.email || '',
+        avatar_url: p?.avatar_url || null,
+        has_grant_all: row.grant_all
+      };
+    });
+
+  // Deduplicate in case there are overlapping records (e.g. grant_all and a specific file grant somehow)
+  const uniqueList = Array.from(new Map(accessList.map(item => [item.student_id, item])).values());
+  return uniqueList;
+}
+

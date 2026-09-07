@@ -224,15 +224,30 @@ export default function SessionRecordings() {
             <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Puzzle size={20} /> Install Chommie
             </h3>
+            
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#b45309', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <AlertTriangle size={16} /> Chommie is currently in pilot
+              </p>
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.85rem', color: '#92400e' }}>
+                It may not work perfectly yet, but we're working hard to improve it. Keep an eye on your inbox for updates on when the feature is fully ready. Thank you for your patience!
+              </p>
+            </div>
+
             <p style={{ fontSize: '0.9rem', color: '#374151' }}>
-              Chommie is a browser extension that captures Google Meet, Microsoft Teams, or Zoom calls
-              directly from your browser tab so notes land here automatically. It's in pilot, so it isn't
-              on the Chrome Web Store yet — install it manually:
+              Chommie captures Google Meet, Microsoft Teams, or Zoom calls directly from your browser tab so your notes land here automatically. It isn't on the Chrome Web Store yet, so you'll need to install it manually:
             </p>
+            
+            <div style={{ margin: '1rem 0' }}>
+              <a href="/chommie-extension.zip" download className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}>
+                <Upload size={16} style={{ transform: 'rotate(180deg)' }} /> Download Extension ZIP
+              </a>
+            </div>
+
             <ol style={{ fontSize: '0.85rem', color: '#374151', paddingLeft: '1.1rem' }}>
-              <li>Download the extension folder from your TutorMina admin/coach resources.</li>
-              <li>Open <code>chrome://extensions</code>, enable Developer mode.</li>
-              <li>Click "Load unpacked" and select the extension folder.</li>
+              <li>Download the extension ZIP using the button above and extract it to a folder.</li>
+              <li>Open <code>chrome://extensions</code> in your browser and enable "Developer mode".</li>
+              <li>Click "Load unpacked" and select the extracted folder.</li>
               <li>Sign in with your TutorMina account from the extension popup.</li>
             </ol>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

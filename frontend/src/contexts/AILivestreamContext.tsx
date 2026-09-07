@@ -4,8 +4,10 @@ import { useRealtimeTranscript } from '../lib/useRealtimeTranscript';
 import { useFactChecker } from '../lib/useFactChecker';
 import { generateLiveNotes, summariseSession } from '../lib/aiApi';
 import { saveSessionNote } from '../lib/aiNotes';
+import { uploadFile } from '../lib/sharedDrive';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './AuthContext';
+import { useModal } from './NotificationContext';
 
 export interface AILivestreamContextType {
   transcript: ReturnType<typeof useRealtimeTranscript>;
@@ -30,6 +32,7 @@ const AILivestreamContext = createContext<AILivestreamContextType | null>(null);
 
 export function AILivestreamProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
+  const { showModal } = useModal();
   
   const transcript = useRealtimeTranscript();
   const factChecker = useFactChecker();
@@ -76,7 +79,12 @@ export function AILivestreamProvider({ children }: { children: ReactNode }) {
       setShowSummaryModal(true);
     } catch (err: any) {
       console.error('Summary error:', err);
-      alert('Failed to generate summary. The AI service may be temporarily unavailable or rate-limited. Please try again in a minute.');
+      showModal({
+        type: 'error',
+        title: 'Summary Error',
+        message: 'Failed to generate summary. The AI service may be temporarily unavailable or rate-limited. Please try again in a minute.',
+        buttons: [{ label: 'OK', onClick: 'dismiss' }]
+      });
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -109,10 +117,33 @@ export function AILivestreamProvider({ children }: { children: ReactNode }) {
         key_topics: [],
       });
 
+      const isProfessional = profile?.role === 'tutor' || profile?.role === 'coach';
+      if (isProfessional) {
+        // Sync to My Resources as a text file
+        const title = `Live Session — ${new Date().toLocaleDateString()}`;
+        const summary = sessionSummary || aiNotes;
+        const fullTranscript = transcript.getFullTranscript();
+        const content = `${summary ? `Summary:\n${summary}\n\n` : ''}Transcript:\n${fullTranscript || ''}`;
+        const fileBlob = new Blob([content], { type: 'text/plain' });
+        const file = new File([fileBlob], `${title}.txt`, { type: 'text/plain' });
+        
+        await uploadFile(file, {
+          title,
+          description: 'AI Generated Live Session Note',
+          file_type: 'notes',
+          visibility: 'private'
+        });
+      }
+
       setSaved(true);
     } catch (err) {
       console.error('Save error:', err);
-      alert('Failed to save session.');
+      showModal({
+        type: 'error',
+        title: 'Save Failed',
+        message: 'Failed to save session.',
+        buttons: [{ label: 'OK', onClick: 'dismiss' }]
+      });
     } finally {
       setIsSaving(false);
     }
