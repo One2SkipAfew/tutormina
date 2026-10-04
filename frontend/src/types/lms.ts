@@ -51,6 +51,11 @@ export interface ProviderDetails {
   rate_amount: number | null;
   rate_currency: 'USD' | 'EUR' | 'ZAR';
   rate_visible: boolean;
+  social_instagram: string | null;
+  social_linkedin: string | null;
+  social_twitter: string | null;
+  social_facebook: string | null;
+  social_tiktok: string | null;
   created_at: string;
 }
 

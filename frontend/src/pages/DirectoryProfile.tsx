@@ -6,6 +6,7 @@ import { formatRate } from '../types/lms';
 import { getWorkExperiences } from '../lib/vetting';
 import BookingCalendarModal from '../components/directory/BookingCalendarModal';
 import { useAuth } from '../contexts/AuthContext';
+import SocialLinks from '../components/social/SocialLinks';
 
 interface FullProfile extends Profile {
   provider_details: ProviderDetails;
@@ -122,6 +123,8 @@ export default function DirectoryProfile() {
                 {formatRate(details.rate_amount, details.rate_currency)}
               </p>
             )}
+
+            <SocialLinks details={details} ownerName={`${profile.first_name} ${profile.last_name}`} size="md" style={{ marginBottom: '1.25rem' }} />
 
             <button
               className="btn btn-primary" 

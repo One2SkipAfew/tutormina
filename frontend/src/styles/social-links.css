@@ -1,0 +1,149 @@
+/* ============================================
+   TutorMina — Social Links (editor + display)
+   ============================================ */
+
+/* ---------- Display: icon row on profile cards ---------- */
+.social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.social-links--center { justify-content: center; }
+.social-links--start { justify-content: flex-start; }
+
+.social-link {
+  --social-brand: var(--color-primary-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.social-links--sm .social-link { width: 32px; height: 32px; }
+.social-links--md .social-link { width: 40px; height: 40px; }
+
+.social-link:hover,
+.social-link:focus-visible {
+  color: #fff;
+  background: var(--social-brand);
+  border-color: var(--social-brand);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px -4px color-mix(in srgb, var(--social-brand) 55%, transparent);
+  outline: none;
+}
+
+.social-link:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--social-brand) 35%, transparent);
+}
+
+/* ---------- Editor: input grid ---------- */
+.social-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+
+@media (max-width: 560px) {
+  .social-fields { grid-template-columns: 1fr; }
+}
+
+.social-fields label.social-field-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: var(--color-text-main);
+}
+
+.social-field-control {
+  --social-brand: var(--color-primary-dark);
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.social-field-icon {
+  position: absolute;
+  left: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  pointer-events: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.social-fields .social-field input.social-field-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 2.4rem 0.7rem 2.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.social-fields .social-field input.social-field-input:focus {
+  outline: none;
+  border-color: var(--social-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--social-brand) 15%, transparent);
+}
+
+.social-field-control:focus-within .social-field-icon,
+.social-field-control:has(input:not(:placeholder-shown)) .social-field-icon {
+  color: #fff;
+  background: var(--social-brand);
+}
+
+.social-field-preview {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.social-field-preview:hover,
+.social-field-preview:focus-visible {
+  color: var(--social-brand);
+  background: #f1f5f9;
+}
+
+.social-field--error input.social-field-input,
+.social-fields .social-field--error input.social-field-input:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.social-field--error .social-field-icon {
+  color: #fff;
+  background: #dc2626;
+}
+
+.social-field-error {
+  margin: 0.3rem 0 0;
+  font-size: 0.74rem;
+  color: #b91c1c;
+}

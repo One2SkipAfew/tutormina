@@ -17,6 +17,9 @@ import {
 } from '../lib/vetting';
 import { useModal, useToast } from '../contexts/NotificationContext';
 import '../styles/vetting.css';
+import SocialLinksFields from '../components/social/SocialLinksFields';
+import { EMPTY_SOCIAL_VALUES, firstSocialError, socialValuesFromDetails, socialValuesToPayload } from '../lib/socialLinks';
+import type { SocialKey, SocialValues } from '../lib/socialLinks';
 
 export default function VettingApplication() {
   const { profile, refreshProfile } = useAuth();
@@ -44,6 +47,8 @@ export default function VettingApplication() {
   const [rateAmount, setRateAmount] = useState('');
   const [rateCurrency, setRateCurrency] = useState<'USD' | 'EUR' | 'ZAR'>('ZAR');
   const [rateVisible, setRateVisible] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialValues>(EMPTY_SOCIAL_VALUES);
+  const handleSocialChange = (key: SocialKey, value: string) => setSocialLinks((prev) => ({ ...prev, [key]: value }));
 
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([]);
   const [weCompany, setWeCompany] = useState('');
@@ -81,6 +86,7 @@ export default function VettingApplication() {
         setRateAmount(details.rate_amount?.toString() ?? '');
         setRateCurrency(details.rate_currency ?? 'ZAR');
         setRateVisible(details.rate_visible ?? false);
+        setSocialLinks(socialValuesFromDetails(details));
       }
       setWorkExperiences(we);
       setReferences(refs);
@@ -125,6 +131,11 @@ export default function VettingApplication() {
   const handleRemoveSpecialty = (s: string) => setSpecialties(specialties.filter((x) => x !== s));
 
   const handleSaveDetails = async () => {
+    const socialError = firstSocialError(socialLinks);
+    if (socialError) {
+      showModal({ type: 'error', title: 'Check Your Social Links', message: socialError, buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+      return;
+    }
     setSaving(true);
     const draft = specialtyDraft.trim();
     const finalSpecialties = draft && !specialties.includes(draft) ? [...specialties, draft] : specialties;
@@ -143,6 +154,7 @@ export default function VettingApplication() {
         rate_amount: rateAmount ? Number(rateAmount) : null,
         rate_currency: rateCurrency,
         rate_visible: rateVisible,
+        ...socialValuesToPayload(socialLinks),
       });
       setSpecialties(finalSpecialties);
       setSpecialtyDraft('');
@@ -190,6 +202,11 @@ export default function VettingApplication() {
   const handleSubmit = async () => {
     if (!qualificationsFileUrl) {
       showModal({ type: 'error', title: 'Missing Qualifications', message: 'Please upload a copy of your qualifications before submitting.', buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+      return;
+    }
+    const socialError = firstSocialError(socialLinks);
+    if (socialError) {
+      showModal({ type: 'error', title: 'Check Your Social Links', message: socialError, buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
       return;
     }
     setSaving(true);
@@ -348,6 +365,14 @@ export default function VettingApplication() {
         <div className="vetting-checkbox-row">
           <label><input type="checkbox" checked={rateVisible} onChange={(e) => setRateVisible(e.target.checked)} /> Show this rate on my public profile</label>
         </div>
+      </div>
+
+      <div className="glass-card vetting-section">
+        <h3>Social media (optional)</h3>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: 0, marginBottom: '1rem' }}>
+          Add your handle or paste a profile link. These appear as icons on your public profile card.
+        </p>
+        <SocialLinksFields values={socialLinks} onChange={handleSocialChange} />
       </div>
 
       <div className="glass-card vetting-section">

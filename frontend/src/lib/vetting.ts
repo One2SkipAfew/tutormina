@@ -68,7 +68,8 @@ export async function uploadProviderQualifications(file: File): Promise<string> 
 export type ProviderDetailsInput = Partial<Pick<ProviderDetails,
   'bio' | 'qualifications' | 'qualifications_file_url' | 'specialties' | 'years_of_experience' | 'location' | 'phone_number' |
   'contact_preference' | 'offers_in_person' | 'offers_virtual' |
-  'rate_amount' | 'rate_currency' | 'rate_visible'
+  'rate_amount' | 'rate_currency' | 'rate_visible' |
+  'social_instagram' | 'social_linkedin' | 'social_twitter' | 'social_facebook' | 'social_tiktok'
 >>;
 
 export async function getProviderDetails(): Promise<ProviderDetails | null> {

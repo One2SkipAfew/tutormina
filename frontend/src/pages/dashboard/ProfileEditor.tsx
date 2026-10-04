@@ -9,6 +9,9 @@ import { useModal, useToast } from '../../contexts/NotificationContext';
 import '../../styles/vetting.css';
 import '../../styles/messaging.css';
 import { User } from 'lucide-react';
+import SocialLinksFields from '../../components/social/SocialLinksFields';
+import { EMPTY_SOCIAL_VALUES, firstSocialError, socialValuesFromDetails, socialValuesToPayload } from '../../lib/socialLinks';
+import type { SocialKey, SocialValues } from '../../lib/socialLinks';
 
 export default function ProfileEditor() {
   const { profile, refreshProfile } = useAuth();
@@ -31,6 +34,8 @@ export default function ProfileEditor() {
   const [qualificationsFileUrl, setQualificationsFileUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingQualifications, setUploadingQualifications] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialValues>(EMPTY_SOCIAL_VALUES);
+  const handleSocialChange = (key: SocialKey, value: string) => setSocialLinks((prev) => ({ ...prev, [key]: value }));
 
   // Student "About You" (customer role)
   const [studentType, setStudentType] = useState<StudentType | ''>('');
@@ -91,6 +96,7 @@ export default function ProfileEditor() {
         setRateVisible(details.rate_visible ?? false);
         setAvatarUrl(details.avatar_url);
         setQualificationsFileUrl(details.qualifications_file_url ?? null);
+        setSocialLinks(socialValuesFromDetails(details));
       }
     } catch (err) {
       showModal({ type: 'error', title: 'Load Failed', message: err instanceof Error ? err.message : 'Failed to load profile details', buttons: [{ label: 'Try Again', variant: 'primary', onClick: 'dismiss' }] });
@@ -221,6 +227,15 @@ export default function ProfileEditor() {
 
   const handleSave = async () => {
     if (!profile) return;
+
+    if (isProvider) {
+      const socialError = firstSocialError(socialLinks);
+      if (socialError) {
+        showModal({ type: 'error', title: 'Check Your Social Links', message: socialError, buttons: [{ label: 'OK', variant: 'primary', onClick: 'dismiss' }] });
+        return;
+      }
+    }
+
     setLoading(true);
 
     const draft = specialtyDraft.trim();
@@ -251,6 +266,7 @@ export default function ProfileEditor() {
           rate_amount: rateAmount ? Number(rateAmount) : null,
           rate_currency: rateCurrency,
           rate_visible: rateVisible,
+          ...socialValuesToPayload(socialLinks),
         });
       } else {
         await saveStudentDetails({
@@ -534,6 +550,18 @@ export default function ProfileEditor() {
                   <input type="checkbox" checked={offersInPerson} onChange={(e) => setOffersInPerson(e.target.checked)} /> Offers in-person sessions
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div className="content-panel" style={{ marginBottom: '1.5rem' }}>
+            <div className="content-panel-header">
+              <h3 className="content-panel-title">Social Media (optional)</h3>
+            </div>
+            <div className="content-panel-body" style={{ maxWidth: '600px' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginTop: 0, marginBottom: '1.25rem' }}>
+                Add your handle or paste a profile link. These appear as icons on your directory profile card so students can get to know you.
+              </p>
+              <SocialLinksFields values={socialLinks} onChange={handleSocialChange} />
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 import { getRoleDisplayName, formatRate } from '../../types/lms';
 import type { Profile, ProviderDetails } from '../../types/lms';
+import SocialLinks from '../social/SocialLinks';
 
 interface ProviderTileProps {
   profile: Profile;
@@ -117,6 +118,8 @@ export default function ProviderTile({ profile, details, onBook, onBookIntro }: 
           {formatRate(details.rate_amount, details.rate_currency)}
         </div>
       )}
+
+      <SocialLinks details={details} ownerName={fullName} style={{ marginBottom: '1rem' }} />
 
       {/* Stats Row */}
       <div style={{
